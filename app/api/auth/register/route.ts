@@ -25,6 +25,8 @@ import { hashPassword } from "@/lib/auth/password";
 import { createToken } from "@/lib/auth/jwt";
 import { eq } from "drizzle-orm";
 import { CATEGORY_RULES } from "@/lib/auto-categorization/categories-rules";
+import { sendVerificationEmail } from "@/lib/email/mailersend";
+import { createId } from "@paralleldrive/cuid2";
 
 /**
  * FUNCȚIE HELPER: Returnează culoare pentru fiecare categorie
@@ -113,6 +115,9 @@ export async function POST(request: NextRequest) {
     // Parola "parola123" devine "$2a$10$xyz..."
     const hashedPassword = await hashPassword(password);
 
+    // PASUL 4.5: Generăm token de verificare
+    const verificationToken = createId(); // Token unic pentru confirmare email
+
     // PASUL 5: Creăm utilizatorul în baza de date
     const newUser = await db
       .insert(schema.users)
@@ -121,6 +126,8 @@ export async function POST(request: NextRequest) {
         password: hashedPassword, // Salvăm parola criptată!
         name,
         nativeCurrency: nativeCurrency || "RON", // Default: RON
+        emailVerified: false, // Contul nu e încă verificat
+        verificationToken, // Token pentru confirmare
       })
       .returning(); // Returnează userul creat
 
@@ -140,7 +147,20 @@ export async function POST(request: NextRequest) {
     await db.insert(schema.categories).values(systemCategories);
     console.log(`✅ ${systemCategories.length} categorii predefinite create!`);
 
+    // PASUL 5.2: Trimitem email de verificare
+    console.log(`📧 Trimitem email de verificare către ${email}...`);
+    const emailResult = await sendVerificationEmail(email, name, verificationToken);
+
+    if (!emailResult.success) {
+      console.error(`⚠️  Email verification failed: ${emailResult.error}`);
+      // Nu eșuăm înregistrarea dacă emailul nu merge - userul poate cere resend
+    } else {
+      console.log(`✅ Email de verificare trimis cu succes!`);
+    }
+
     // PASUL 6: Creăm token JWT
+    // IMPORTANT: În producție, ar trebui să NU permitem login până la verificare
+    // Pentru DEMO, permitem accesul dar afișăm notificare
     const token = createToken({
       userId: newUser[0].id,
       email: newUser[0].email,
@@ -149,12 +169,13 @@ export async function POST(request: NextRequest) {
     // PASUL 7: Returnăm succesul
     return NextResponse.json(
       {
-        message: "Utilizator creat cu succes",
+        message: "Utilizator creat cu succes! Verifică emailul pentru confirmare.",
         user: {
           id: newUser[0].id,
           email: newUser[0].email,
           name: newUser[0].name,
           nativeCurrency: newUser[0].nativeCurrency,
+          emailVerified: false, // Informăm frontend-ul
         },
         token, // Token-ul pentru a fi salvat în frontend
       },
