@@ -1,0 +1,335 @@
+/**
+ * UTILITĂȚI PARSARE FIȘIERE
+ *
+ * EXPLICAȚIE:
+ * Funcții pentru parsarea fișierelor CSV și Excel în tranzacții.
+ *
+ * CONCEPTE:
+ * - CSV = Comma-Separated Values (valori separate prin virgulă)
+ * - Excel = Format binar (.xlsx) al Microsoft
+ * - Parser = Funcție care transformă text/binary în obiecte JavaScript
+ */
+
+import Papa from "papaparse";
+import * as XLSX from "xlsx";
+
+/**
+ * Tipul pentru o tranzacție parsată
+ */
+export interface ParsedTransaction {
+  date: string; // Format: YYYY-MM-DD
+  description: string;
+  amount: number;
+  currency?: string;
+  type?: "debit" | "credit";
+  originalData?: any; // Datele originale din fișier
+}
+
+/**
+ * Rezultatul parsării
+ */
+export interface ParseResult {
+  success: boolean;
+  transactions: ParsedTransaction[];
+  error?: string;
+  rowCount?: number;
+}
+
+/**
+ * FUNCȚIA 1: Parse CSV
+ *
+ * Parsează un fișier CSV și extrage tranzacțiile.
+ *
+ * PARAMETRI:
+ * @param file - Fișierul CSV (File object din input)
+ * @returns Promise cu rezultatul parsării
+ *
+ * EXEMPLU CSV:
+ * Data,Descriere,Suma,Moneda
+ * 01.12.2025,MEGA IMAGE,-45.50,RON
+ * 02.12.2025,Salariu,5000.00,RON
+ */
+export async function parseCSV(file: File): Promise<ParseResult> {
+  return new Promise((resolve) => {
+    Papa.parse(file, {
+      header: true, // Prima linie = header-e (nume coloane)
+      skipEmptyLines: true, // Ignoră liniile goale
+      complete: (results) => {
+        try {
+          // Verificăm dacă avem date
+          if (!results.data || results.data.length === 0) {
+            resolve({
+              success: false,
+              transactions: [],
+              error: "Fișierul CSV este gol",
+            });
+            return;
+          }
+
+          // Transformăm fiecare rând în tranzacție
+          const transactions: ParsedTransaction[] = [];
+
+          results.data.forEach((row: any, index: number) => {
+            try {
+              // Detectăm automat coloanele (flexibil pentru diverse formate)
+              const date = detectDate(row);
+              const description = detectDescription(row);
+              const amount = detectAmount(row);
+              const currency = detectCurrency(row);
+
+              if (date && description && amount !== null) {
+                transactions.push({
+                  date: formatDate(date),
+                  description: description.trim(),
+                  amount: parseFloat(amount),
+                  currency: currency || "RON",
+                  type: parseFloat(amount) < 0 ? "debit" : "credit",
+                  originalData: row, // Păstrăm datele originale
+                });
+              }
+            } catch (err) {
+              console.warn(`Eroare la parsarea rândului ${index + 1}:`, err);
+            }
+          });
+
+          resolve({
+            success: true,
+            transactions,
+            rowCount: results.data.length,
+          });
+        } catch (error: any) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: error.message,
+          });
+        }
+      },
+      error: (error) => {
+        resolve({
+          success: false,
+          transactions: [],
+          error: error.message,
+        });
+      },
+    });
+  });
+}
+
+/**
+ * FUNCȚIA 2: Parse Excel
+ *
+ * Parsează un fișier Excel (.xlsx) și extrage tranzacțiile.
+ */
+export async function parseExcel(file: File): Promise<ParseResult> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        const data = e.target?.result;
+        if (!data) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: "Nu s-a putut citi fișierul",
+          });
+          return;
+        }
+
+        // Parsăm Excel-ul
+        const workbook = XLSX.read(data, { type: "binary" });
+
+        // Luăm prima foaie (sheet)
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+
+        // Convertim în JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+
+        if (jsonData.length === 0) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: "Fișierul Excel este gol",
+          });
+          return;
+        }
+
+        // Transformăm în tranzacții (similar cu CSV)
+        const transactions: ParsedTransaction[] = [];
+
+        jsonData.forEach((row: any) => {
+          try {
+            const date = detectDate(row);
+            const description = detectDescription(row);
+            const amount = detectAmount(row);
+            const currency = detectCurrency(row);
+
+            if (date && description && amount !== null) {
+              transactions.push({
+                date: formatDate(date),
+                description: description.trim(),
+                amount: parseFloat(amount),
+                currency: currency || "RON",
+                type: parseFloat(amount) < 0 ? "debit" : "credit",
+                originalData: row,
+              });
+            }
+          } catch (err) {
+            console.warn("Eroare la parsarea rândului:", err);
+          }
+        });
+
+        resolve({
+          success: true,
+          transactions,
+          rowCount: jsonData.length,
+        });
+      } catch (error: any) {
+        resolve({
+          success: false,
+          transactions: [],
+          error: error.message,
+        });
+      }
+    };
+
+    reader.onerror = () => {
+      resolve({
+        success: false,
+        transactions: [],
+        error: "Eroare la citirea fișierului",
+      });
+    };
+
+    reader.readAsBinaryString(file);
+  });
+}
+
+/**
+ * FUNCȚII HELPER - Detectare automată coloane
+ *
+ * Aceste funcții încearcă să ghicească care coloană conține ce informație.
+ * Funcționează cu diverse formate de extrase bancare.
+ */
+
+function detectDate(row: any): string | null {
+  // Căutăm o coloană care arată ca o dată
+  // Adăugăm "completed" pentru Revolut (Completed Date)
+  const dateKeys = ["completed", "data", "date", "data operatiunii", "data tranzactiei"];
+
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (dateKeys.some((k) => lowerKey.includes(k))) {
+      return row[key];
+    }
+  }
+
+  // Dacă nu găsim, luăm prima coloană care arată ca o dată
+  for (const value of Object.values(row)) {
+    if (typeof value === "string" && isDate(value)) {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function detectDescription(row: any): string | null {
+  const descKeys = ["descriere", "description", "detalii", "details", "beneficiar"];
+
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (descKeys.some((k) => lowerKey.includes(k))) {
+      return row[key];
+    }
+  }
+
+  return null;
+}
+
+function detectAmount(row: any): string | null {
+  const amountKeys = ["suma", "amount", "valoare", "value", "total"];
+
+  // Căutăm o coloană cu suma
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (amountKeys.some((k) => lowerKey.includes(k))) {
+      return row[key];
+    }
+  }
+
+  // Dacă nu găsim, verificăm dacă există coloane separate Debit/Credit (format ING)
+  const debitKeys = ["debit"];
+  const creditKeys = ["credit"];
+
+  let debitValue: string | null = null;
+  let creditValue: string | null = null;
+
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (debitKeys.some((k) => lowerKey.includes(k))) {
+      debitValue = row[key];
+    }
+    if (creditKeys.some((k) => lowerKey.includes(k))) {
+      creditValue = row[key];
+    }
+  }
+
+  // Dacă avem Debit/Credit, returnăm valoarea care nu e goală
+  // Debit = negativ (cheltuială), Credit = pozitiv (venit)
+  if (debitValue && debitValue.trim() !== "") {
+    return `-${debitValue}`;
+  }
+  if (creditValue && creditValue.trim() !== "") {
+    return creditValue;
+  }
+
+  return null;
+}
+
+function detectCurrency(row: any): string | null {
+  const currencyKeys = ["moneda", "currency", "valuta"];
+
+  for (const key of Object.keys(row)) {
+    const lowerKey = key.toLowerCase();
+    if (currencyKeys.some((k) => lowerKey.includes(k))) {
+      return row[key];
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Verifică dacă un string arată ca o dată
+ */
+function isDate(str: string): boolean {
+  // Formate acceptate: DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY-MM-DD HH:MM (cu timestamp)
+  const dateRegex = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$|^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2})?$/;
+  return dateRegex.test(str);
+}
+
+/**
+ * Formatează data în format ISO (YYYY-MM-DD)
+ */
+function formatDate(dateStr: string): string {
+  // Dacă e deja ISO format (cu sau fără timestamp)
+  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+    // Extragem doar partea de dată (fără timestamp)
+    return dateStr.split(" ")[0];
+  }
+
+  // Parsăm formate românești: DD.MM.YYYY sau DD/MM/YYYY
+  const parts = dateStr.split(/[./-]/);
+
+  if (parts.length === 3) {
+    const [day, month, year] = parts;
+    const fullYear = year.length === 2 ? `20${year}` : year;
+    return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+  }
+
+  // Fallback: returnăm data curentă
+  return new Date().toISOString().split("T")[0];
+}
