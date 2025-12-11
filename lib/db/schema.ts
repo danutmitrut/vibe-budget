@@ -29,6 +29,15 @@ export const users = sqliteTable("users", {
   password: text("password").notNull(), // Parola (criptată cu bcrypt)
   name: text("name").notNull(),
   nativeCurrency: text("native_currency").notNull().default("RON"), // RON sau MDL
+
+  // EMAIL VERIFICATION
+  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  verificationToken: text("verification_token"),
+
+  // PASSWORD RESET
+  resetToken: text("reset_token"),
+  resetTokenExpiry: integer("reset_token_expiry", { mode: "timestamp" }),
+
   createdAt: integer("created_at", { mode: "timestamp" })
     .notNull()
     .$defaultFn(() => new Date()),
