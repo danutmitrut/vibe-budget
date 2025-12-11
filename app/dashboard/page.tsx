@@ -155,6 +155,14 @@ export default function DashboardPage() {
             </p>
           </Link>
 
+          <Link href="/dashboard/ai-insights" className="bg-gradient-to-br from-green-500 to-teal-600 text-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
+            <div className="text-4xl mb-3">🤖</div>
+            <h3 className="text-lg font-semibold mb-2">AI Insights</h3>
+            <p className="text-white/90 text-sm">
+              Analiză inteligentă by Claude AI
+            </p>
+          </Link>
+
           <Link href="/dashboard/banks" className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
             <div className="text-4xl mb-3">🏦</div>
             <h3 className="text-lg font-semibold mb-2">Gestionează bănci</h3>
