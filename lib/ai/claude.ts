@@ -101,7 +101,7 @@ RĂSPUNDE ÎN JSON FORMAT:
 ]`;
 
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 2000,
       messages: [
         {
@@ -191,7 +191,7 @@ RĂSPUNDE ÎN JSON FORMAT:
 ]`;
 
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1500,
       messages: [
         {
@@ -274,7 +274,7 @@ RĂSPUNDE ÎN JSON FORMAT:
 }`;
 
     const message = await anthropic.messages.create({
-      model: "claude-3-5-sonnet-20241022",
+      model: "claude-sonnet-4-5-20250929",
       max_tokens: 1500,
       messages: [
         {
@@ -289,15 +289,20 @@ RĂSPUNDE ÎN JSON FORMAT:
       throw new Error("Unexpected response type");
     }
 
+    console.log("🤖 Claude AI response:", content.text.substring(0, 500));
+
     const jsonMatch = content.text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) {
+      console.error("❌ Could not find JSON in response:", content.text);
       throw new Error("Could not parse health score");
     }
 
     const healthScore: FinancialHealthScore = JSON.parse(jsonMatch[0]);
+    console.log("✅ Parsed health score:", healthScore.score, healthScore.grade);
     return healthScore;
   } catch (error: any) {
     console.error("❌ Health score calculation error:", error);
+    console.error("Error details:", error.message, error.stack);
     // Return default/fallback score
     return {
       score: 5.0,

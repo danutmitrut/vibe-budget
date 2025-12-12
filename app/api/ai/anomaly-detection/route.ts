@@ -52,9 +52,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Neautentificat" }, { status: 401 });
     }
 
-    // PASUL 2: Colectăm tranzacții recente (ultimele 7 zile)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // PASUL 2: Colectăm tranzacții recente (ultimele 3 luni)
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
 
     const recentTransactions = await db
       .select()
@@ -62,13 +62,13 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, sevenDaysAgo)
+          gte(schema.transactions.date, threeMonthsAgo)
         )
       );
 
-    // PASUL 3: Colectăm date istorice (ultimele 3 luni)
-    const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    // PASUL 3: Colectăm date istorice (ultimele 12 luni)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
     const historicalTransactions = await db
       .select()
@@ -76,8 +76,8 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, threeMonthsAgo),
-          lte(schema.transactions.date, sevenDaysAgo) // Exclude recent pentru calcul medie
+          gte(schema.transactions.date, twelveMonthsAgo),
+          lte(schema.transactions.date, threeMonthsAgo) // Exclude recent pentru calcul medie
         )
       );
 

@@ -66,6 +66,14 @@ interface StatsResponse {
   byBank: BankStats[];
 }
 
+interface BudgetRecommendation {
+  category: string;
+  currentSpending: number;
+  suggestedReduction: number;
+  potentialSavings: number;
+  actionItems: string[];
+}
+
 export default function ReportsPage() {
   const router = useRouter();
 
@@ -73,6 +81,7 @@ export default function ReportsPage() {
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [recommendations, setRecommendations] = useState<BudgetRecommendation[]>([]);
 
   // STATE pentru filtre
   const [period, setPeriod] = useState("month"); // "month" sau "year"
@@ -88,6 +97,7 @@ export default function ReportsPage() {
    */
   useEffect(() => {
     fetchStats();
+    fetchRecommendations();
   }, [period]); // Re-fetch când se schimbă perioada
 
   /**
@@ -125,6 +135,28 @@ export default function ReportsPage() {
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  /**
+   * FUNCȚIE: Fetch AI Budget Recommendations
+   */
+  const fetchRecommendations = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) return;
+
+      const response = await fetch("/api/ai/budget-recommendations", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRecommendations(data.recommendations || []);
+      }
+    } catch (err) {
+      // Recommendations sunt opționale, nu arătăm eroare
+      console.log("AI recommendations unavailable");
     }
   };
 
@@ -408,7 +440,7 @@ export default function ReportsPage() {
                     const total = stats.byCategory.reduce((sum, c) => sum + c.amount, 0);
                     const percent = (cat.amount / total) * 100;
                     return percent >= minPercentage;
-                  })}
+                  }) as any}
                   dataKey="amount"
                   nameKey="name"
                   cx="50%"
@@ -416,7 +448,7 @@ export default function ReportsPage() {
                   outerRadius={chartSize}
                   label={
                     showLabels
-                      ? (entry) => {
+                      ? (entry: any) => {
                           // Arătăm doar procentul pe fiecare segment
                           const filteredData = stats.byCategory.filter((cat) => {
                             const total = stats.byCategory.reduce((sum, c) => sum + c.amount, 0);
@@ -493,7 +525,7 @@ export default function ReportsPage() {
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h2 className="text-xl font-bold mb-4">Distribuție pe Bănci</h2>
             <ResponsiveContainer width="100%" height={400}>
-              <BarChart data={stats.byBank}>
+              <BarChart data={stats.byBank as any}>
                 <XAxis dataKey="name" />
                 <YAxis />
                 <Tooltip
@@ -540,6 +572,79 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* AI Budget Recommendations Widget */}
+        {recommendations.length > 0 && (
+          <div className="bg-gradient-to-br from-green-50 to-teal-50 rounded-xl shadow-lg p-6 border-2 border-green-200">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                  💡 Recomandări de Economisire
+                </h2>
+                <p className="text-sm text-gray-600 mt-1">
+                  Sugestii inteligente de la Claude AI pentru a-ți optimiza bugetul
+                </p>
+              </div>
+              <Link
+                href="/dashboard/ai-insights"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition text-sm font-semibold"
+              >
+                Vezi toate insights →
+              </Link>
+            </div>
+
+            <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {recommendations.slice(0, 3).map((rec, idx) => (
+                <div
+                  key={idx}
+                  className="bg-white rounded-lg p-5 shadow border-2 border-green-300 hover:shadow-lg transition"
+                >
+                  <h3 className="font-bold text-lg text-gray-900 mb-2">{rec.category}</h3>
+
+                  <div className="mb-4">
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="text-sm text-gray-600">Cheltuieli actuale</span>
+                      <span className="font-semibold text-red-600">
+                        {formatCurrency(rec.currentSpending)} RON
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm text-gray-600">Poți economisi</span>
+                      <span className="font-bold text-green-600">
+                        +{formatCurrency(rec.potentialSavings)} RON/an
+                      </span>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-semibold text-gray-700 mb-2">
+                      Acțiuni sugerate:
+                    </div>
+                    <ul className="space-y-1">
+                      {rec.actionItems.slice(0, 2).map((action, aidx) => (
+                        <li key={aidx} className="text-sm text-gray-700 flex items-start gap-1">
+                          <span className="text-green-600 mt-0.5">→</span>
+                          <span>{action}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {recommendations.length > 3 && (
+              <div className="mt-4 text-center">
+                <Link
+                  href="/dashboard/ai-insights"
+                  className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
+                >
+                  + {recommendations.length - 3} recomandări suplimentare
+                </Link>
+              </div>
+            )}
           </div>
         )}
 

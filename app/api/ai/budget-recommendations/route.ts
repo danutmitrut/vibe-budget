@@ -52,8 +52,8 @@ export async function GET(request: NextRequest) {
     }
 
     // PASUL 2: Colectăm date despre ultimele 30 zile
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
     const transactions = await db
       .select()
@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, thirtyDaysAgo)
+          gte(schema.transactions.date, twelveMonthsAgo)
         )
       );
 
@@ -140,7 +140,7 @@ export async function GET(request: NextRequest) {
         monthlyIncome: Math.round(totalIncome),
         monthlyExpenses: Math.round(totalExpenses),
         period: {
-          startDate: thirtyDaysAgo.toISOString(),
+          startDate: twelveMonthsAgo.toISOString(),
           endDate: new Date().toISOString(),
         },
       },

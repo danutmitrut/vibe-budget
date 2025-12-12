@@ -19,7 +19,7 @@ console.log("🔧 Începem migrarea...");
 
 try {
   // Verificăm dacă coloana există deja
-  const tableInfo = db.pragma("table_info(categories)");
+  const tableInfo = db.pragma("table_info(categories)") as any;
   const columnExists = tableInfo.some(
     (col: any) => col.name === "is_system_category"
   );

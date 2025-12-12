@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Neautentificat" }, { status: 401 });
     }
 
-    // PASUL 2: Colectăm date despre ultimele 30 zile
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // PASUL 2: Colectăm date despre ultimele 12 luni (sau toate dacă sunt mai puține)
+    const twelveMonthsAgo = new Date();
+    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
     const transactions = await db
       .select()
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, thirtyDaysAgo)
+          gte(schema.transactions.date, twelveMonthsAgo)
         )
       );
 
@@ -140,9 +140,9 @@ export async function GET(request: NextRequest) {
       ...healthScore,
       metrics,
       period: {
-        startDate: thirtyDaysAgo.toISOString(),
+        startDate: twelveMonthsAgo.toISOString(),
         endDate: new Date().toISOString(),
-        days: 30,
+        days: 365,
       },
       updatedAt: new Date().toISOString(),
     });

@@ -38,6 +38,10 @@ yarn-error.log*
 *.db-shm
 *.db-wal
 
+# test data
+sample-transactions-*.csv
+/scripts/test-data/
+
 # vercel
 .vercel
 

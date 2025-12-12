@@ -29,7 +29,7 @@ try {
   }
 
   // Verificăm dacă coloana există deja
-  const tableInfo: any[] = db.pragma("table_info(categories)");
+  const tableInfo: any[] = db.pragma("table_info(categories)") as any;
   const columnExists = tableInfo.some(
     (col: any) => col.name === "is_system_category"
   );

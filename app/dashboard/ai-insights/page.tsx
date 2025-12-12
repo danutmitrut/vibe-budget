@@ -185,13 +185,13 @@ export default function AIInsightsPage() {
               {/* Overall Score */}
               <div className="text-center p-8 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border-2 border-indigo-200">
                 <div className="text-6xl font-bold text-indigo-600 mb-2">
-                  {healthScore.score.toFixed(1)}
+                  {(healthScore.score || 0).toFixed(1)}
                 </div>
                 <div className="text-3xl font-bold text-gray-900 mb-2">/ 10</div>
                 <div
-                  className={`inline-block px-6 py-2 rounded-full text-2xl font-bold border-2 ${getGradeColor(healthScore.grade)}`}
+                  className={`inline-block px-6 py-2 rounded-full text-2xl font-bold border-2 ${getGradeColor(healthScore.grade || 'N/A')}`}
                 >
-                  {healthScore.grade}
+                  {healthScore.grade || 'N/A'}
                 </div>
               </div>
 
@@ -200,12 +200,12 @@ export default function AIInsightsPage() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="font-semibold">💰 Cash Flow</span>
-                    <span className="font-bold">{healthScore.breakdown.cashFlow}/10</span>
+                    <span className="font-bold">{healthScore.breakdown?.cashFlow || 0}/10</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className="bg-green-500 h-3 rounded-full"
-                      style={{ width: `${(healthScore.breakdown.cashFlow / 10) * 100}%` }}
+                      style={{ width: `${((healthScore.breakdown?.cashFlow || 0) / 10) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -213,13 +213,13 @@ export default function AIInsightsPage() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="font-semibold">📊 Diversificare</span>
-                    <span className="font-bold">{healthScore.breakdown.diversification}/10</span>
+                    <span className="font-bold">{healthScore.breakdown?.diversification || 0}/10</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className="bg-blue-500 h-3 rounded-full"
                       style={{
-                        width: `${(healthScore.breakdown.diversification / 10) * 100}%`,
+                        width: `${((healthScore.breakdown?.diversification || 0) / 10) * 100}%`,
                       }}
                     />
                   </div>
@@ -228,12 +228,12 @@ export default function AIInsightsPage() {
                 <div>
                   <div className="flex justify-between mb-1">
                     <span className="font-semibold">💵 Rată Economisire</span>
-                    <span className="font-bold">{healthScore.breakdown.savingsRate}/10</span>
+                    <span className="font-bold">{healthScore.breakdown?.savingsRate || 0}/10</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div
                       className="bg-purple-500 h-3 rounded-full"
-                      style={{ width: `${(healthScore.breakdown.savingsRate / 10) * 100}%` }}
+                      style={{ width: `${((healthScore.breakdown?.savingsRate || 0) / 10) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -245,25 +245,25 @@ export default function AIInsightsPage() {
               <div className="bg-green-50 p-4 rounded-lg border border-green-200">
                 <div className="text-sm text-gray-600 mb-1">Venit Lunar</div>
                 <div className="text-xl font-bold text-green-600">
-                  {formatCurrency(healthScore.metrics.monthlyIncome)} RON
+                  {formatCurrency(healthScore.metrics?.monthlyIncome || 0)} RON
                 </div>
               </div>
               <div className="bg-red-50 p-4 rounded-lg border border-red-200">
                 <div className="text-sm text-gray-600 mb-1">Cheltuieli</div>
                 <div className="text-xl font-bold text-red-600">
-                  {formatCurrency(healthScore.metrics.monthlyExpenses)} RON
+                  {formatCurrency(healthScore.metrics?.monthlyExpenses || 0)} RON
                 </div>
               </div>
-              <div className={`p-4 rounded-lg border ${healthScore.metrics.balance >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
+              <div className={`p-4 rounded-lg border ${(healthScore.metrics?.balance || 0) >= 0 ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}`}>
                 <div className="text-sm text-gray-600 mb-1">Balanță</div>
-                <div className={`text-xl font-bold ${healthScore.metrics.balance >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {formatCurrency(healthScore.metrics.balance)} RON
+                <div className={`text-xl font-bold ${(healthScore.metrics?.balance || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {formatCurrency(healthScore.metrics?.balance || 0)} RON
                 </div>
               </div>
               <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
                 <div className="text-sm text-gray-600 mb-1">Economii</div>
                 <div className="text-xl font-bold text-blue-600">
-                  {healthScore.metrics.savingsRate.toFixed(1)}%
+                  {(healthScore.metrics?.savingsRate || 0).toFixed(1)}%
                 </div>
               </div>
             </div>
@@ -273,7 +273,7 @@ export default function AIInsightsPage() {
               <div>
                 <h3 className="font-bold text-lg mb-3 text-green-600">✅ Puncte Forte</h3>
                 <ul className="space-y-2">
-                  {healthScore.strengths.map((strength, idx) => (
+                  {(healthScore.strengths || []).map((strength, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <span className="text-green-500 mt-1">•</span>
                       <span>{strength}</span>
@@ -285,7 +285,7 @@ export default function AIInsightsPage() {
               <div>
                 <h3 className="font-bold text-lg mb-3 text-red-600">⚠️ Puncte Slabe</h3>
                 <ul className="space-y-2">
-                  {healthScore.weaknesses.map((weakness, idx) => (
+                  {(healthScore.weaknesses || []).map((weakness, idx) => (
                     <li key={idx} className="flex items-start gap-2">
                       <span className="text-red-500 mt-1">•</span>
                       <span>{weakness}</span>
