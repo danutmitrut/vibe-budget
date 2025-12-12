@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
  * {
  *   "code": "EUR",
  *   "symbol": "€",
- *   "isNative": false
+ *   "name": "Euro" (opțional, folosește code dacă lipsește)
  * }
  */
 export async function POST(request: NextRequest) {
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { code, symbol, isNative } = body;
+    const { code, symbol, name } = body;
 
     // Validare
     if (!code || !symbol) {
@@ -71,13 +71,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Creăm valuta
+    // Creăm valuta (name e opțional, folosim code ca fallback)
     const newCurrency = await db
       .insert(schema.currencies)
       .values({
         userId: user.id,
         code: code.toUpperCase(),
-        name, // Adăugăm name care este required în schema
+        name: name || code.toUpperCase(), // Folosim name din body sau code ca fallback
         symbol,
       })
       .returning();
