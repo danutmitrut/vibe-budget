@@ -91,7 +91,7 @@ export default function RegisterPage() {
                 setFormData({ ...formData, name: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-              placeholder="Dan Mitrut"
+              placeholder="Ion Popescu"
             />
           </div>
 
@@ -112,7 +112,7 @@ export default function RegisterPage() {
                 setFormData({ ...formData, email: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-              placeholder="dan@example.com"
+              placeholder="exemplu@email.com"
             />
           </div>
 
