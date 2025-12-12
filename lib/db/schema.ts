@@ -1,5 +1,5 @@
 /**
- * SCHEMA BAZĂ DE DATE - Vibe Budget
+ * SCHEMA BAZĂ DE DATE - Vibe Budget (PostgreSQL / Supabase)
  *
  * EXPLICAȚIE: Acesta este "planul" bazei noastre de date.
  * Definim ce tabele avem și ce informații stocăm în fiecare.
@@ -7,7 +7,7 @@
  * E ca un formular: fiecare coloană este un câmp de completat.
  */
 
-import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
+import { pgTable, text, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 
 /**
@@ -21,7 +21,7 @@ import { createId } from "@paralleldrive/cuid2";
  * - nativeCurrency: Moneda nativă (RON sau MDL)
  * - createdAt: Când s-a înregistrat
  */
-export const users = sqliteTable("users", {
+export const users = pgTable("users", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()), // Generează automat un ID unic
@@ -31,16 +31,19 @@ export const users = sqliteTable("users", {
   nativeCurrency: text("native_currency").notNull().default("RON"), // RON sau MDL
 
   // EMAIL VERIFICATION
-  emailVerified: integer("email_verified", { mode: "boolean" }).notNull().default(false),
+  emailVerified: boolean("email_verified").notNull().default(false),
   verificationToken: text("verification_token"),
 
   // PASSWORD RESET
   resetToken: text("reset_token"),
-  resetTokenExpiry: integer("reset_token_expiry", { mode: "timestamp" }),
+  resetTokenExpiry: timestamp("reset_token_expiry"),
 
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -55,7 +58,7 @@ export const users = sqliteTable("users", {
  *
  * EXEMPLU: User Dan adaugă "ING Bank" și "Revolut"
  */
-export const banks = sqliteTable("banks", {
+export const banks = pgTable("banks", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
@@ -63,10 +66,13 @@ export const banks = sqliteTable("banks", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }), // Dacă ștergi userul, se șterg și băncile lui
   name: text("name").notNull(),
-  color: text("color"), // #FF5733 (hex color)
-  createdAt: integer("created_at", { mode: "timestamp" })
+  color: text("color").default("#6366f1"), // #FF5733 (hex color)
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -77,12 +83,12 @@ export const banks = sqliteTable("banks", {
  * - userId: La cine aparține valuta
  * - code: Codul valutar (RON, EUR, USD, MDL)
  * - symbol: Simbolul (lei, €, $)
- * - isNative: Dacă e moneda nativă (true/false)
+ * - name: Numele complet (Romanian Leu, Euro, etc)
  * - createdAt: Când a fost adăugată
  *
  * EXEMPLU: User adaugă RON (nativă), EUR, USD
  */
-export const currencies = sqliteTable("currencies", {
+export const currencies = pgTable("currencies", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
@@ -90,11 +96,11 @@ export const currencies = sqliteTable("currencies", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   code: text("code").notNull(), // RON, EUR, USD, MDL
+  name: text("name").notNull(), // Romanian Leu, Euro, US Dollar
   symbol: text("symbol").notNull(), // lei, €, $
-  isNative: integer("is_native", { mode: "boolean" }).notNull().default(false),
-  createdAt: integer("created_at", { mode: "timestamp" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
 /**
@@ -104,7 +110,7 @@ export const currencies = sqliteTable("currencies", {
  * - id: Identificator unic
  * - userId: La cine aparține categoria
  * - name: Numele categoriei (Salariu, Chirie, Mâncare, etc)
- * - type: Tipul (income = venit, expense = cheltuială, savings = economii)
+ * - type: Tipul (income = venit, expense = cheltuială)
  * - color: Culoare pentru grafice
  * - icon: Emoji sau nume de icon (opțional)
  * - isSystemCategory: Dacă e categorie predefinită (nu se poate șterge)
@@ -116,7 +122,7 @@ export const currencies = sqliteTable("currencies", {
  * - Mâncare (expense) 🍔 [SYSTEM]
  * - Economii (savings) 🐷 [CUSTOM]
  */
-export const categories = sqliteTable("categories", {
+export const categories = pgTable("categories", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
@@ -124,16 +130,17 @@ export const categories = sqliteTable("categories", {
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  type: text("type").notNull(), // "income" | "expense" | "savings"
-  color: text("color"),
-  icon: text("icon"), // Emoji sau nume icon
+  type: text("type").notNull().default("expense"), // "income" | "expense"
+  color: text("color").default("#6366f1"),
+  icon: text("icon").default("📁"), // Emoji sau nume icon
   description: text("description"), // Explicația categoriei (ex: "Benzină, taxi, metrou, parcări")
-  isSystemCategory: integer("is_system_category", { mode: "boolean" }).default(
-    false
-  ), // false = categorie custom, true = categorie predefinită (NOT NULL implicit)
-  createdAt: integer("created_at", { mode: "timestamp" })
+  isSystemCategory: boolean("is_system_category").default(false), // false = categorie custom, true = categorie predefinită
+  createdAt: timestamp("created_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
+    .notNull()
+    .defaultNow(),
 });
 
 /**
@@ -150,11 +157,6 @@ export const categories = sqliteTable("categories", {
  * - description: Descrierea (ce scrie în extrasul bancar)
  * - amount: Suma (cât s-a plătit sau încasat)
  * - currency: Valuta (RON, EUR, USD, etc)
- * - type: Tipul (debit = cheltuială, credit = venit)
- * - source: De unde vine (csv, excel, pdf, manual)
- * - originalData: Datele originale din fișier (JSON) - păstrăm pentru referință
- * - isCategorized: Dacă a fost categorizată de user (true/false)
- * - aiSuggestion: Sugestia AI pentru categorie (opțional)
  * - createdAt: Când a fost importată
  *
  * EXEMPLU de tranzacție:
@@ -162,12 +164,10 @@ export const categories = sqliteTable("categories", {
  *   date: "2025-01-15",
  *   description: "MEGA IMAGE 123",
  *   amount: -45.50,
- *   currency: "RON",
- *   type: "debit",
- *   categoryId: null (încă nu e categorizată)
+ *   currency: "RON"
  * }
  */
-export const transactions = sqliteTable("transactions", {
+export const transactions = pgTable("transactions", {
   id: text("id")
     .primaryKey()
     .$defaultFn(() => createId()),
@@ -178,21 +178,16 @@ export const transactions = sqliteTable("transactions", {
   categoryId: text("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
-  date: integer("date", { mode: "timestamp" }).notNull(), // Data tranzacției
+  date: timestamp("date").notNull(), // Data tranzacției
   description: text("description").notNull(), // "MEGA IMAGE 123"
-  amount: real("amount").notNull(), // -45.50 (negativ = cheltuială, pozitiv = venit)
+  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // -45.50 (negativ = cheltuială, pozitiv = venit)
   currency: text("currency").notNull().default("RON"), // RON, EUR, USD
-  type: text("type").notNull(), // "debit" sau "credit"
-  source: text("source").notNull().default("csv"), // csv, excel, pdf, manual
-  originalData: text("original_data"), // JSON cu datele originale din fișier
-  isCategorized: integer("is_categorized", { mode: "boolean" })
+  createdAt: timestamp("created_at")
     .notNull()
-    .default(false),
-  aiSuggestion: text("ai_suggestion"), // Categoria sugerată de AI (JSON)
-  notes: text("notes"), // Note adăugate de user
-  createdAt: integer("created_at", { mode: "timestamp" })
+    .defaultNow(),
+  updatedAt: timestamp("updated_at")
     .notNull()
-    .$defaultFn(() => new Date()),
+    .defaultNow(),
 });
 
 /**

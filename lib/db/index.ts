@@ -1,35 +1,47 @@
 /**
- * CONEXIUNE LA BAZA DE DATE
+ * CONEXIUNE LA BAZA DE DATE - SUPABASE PostgreSQL
  *
  * EXPLICAȚIE:
- * Aici creăm "podul" dintre aplicația noastră și baza de date SQLite.
- * SQLite = o bază de date locală (un fișier pe disk).
+ * Aici creăm "podul" dintre aplicația noastră și baza de date Supabase.
+ * Supabase = PostgreSQL în cloud (pentru production).
  *
  * CONCEPTE:
- * - Database = Fișierul unde sunt stocate datele (vibe-budget.db)
+ * - Database = PostgreSQL (mai puternic decât SQLite)
  * - Drizzle = Biblioteca care ne ajută să vorbim cu baza de date
- * - Singleton pattern = Creăm o singură conexiune și o refolosim
+ * - Connection string = URL-ul către baza de date Supabase
  */
 
-import Database from "better-sqlite3";
-import { drizzle } from "drizzle-orm/better-sqlite3";
+import { drizzle } from "drizzle-orm/postgres-js";
+import postgres from "postgres";
 import * as schema from "./schema";
 
 /**
- * PASUL 1: Cream fișierul bazei de date
+ * PASUL 1: Creăm conexiunea la Supabase PostgreSQL
  *
- * Dacă fișierul nu există, better-sqlite3 îl creează automat.
- * Localul: în folderul proiectului va apărea "vibe-budget.db"
+ * Connection string format:
+ * postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
  */
-const sqlite = new Database("vibe-budget.db");
+const connectionString = process.env.DATABASE_URL ||
+  `postgresql://postgres.yctmwqwrwoeqdavqjnko:${process.env.SUPABASE_DB_PASSWORD}@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`;
 
 /**
- * PASUL 2: Conectăm Drizzle la SQLite
+ * PASUL 2: Configurăm client-ul PostgreSQL
+ *
+ * prepare: false - necesar pentru Supabase connection pooler
+ * max: 1 - pentru environment serverless (Vercel)
+ */
+const client = postgres(connectionString, {
+  prepare: false,
+  max: 1, // Important pentru Vercel serverless
+});
+
+/**
+ * PASUL 3: Conectăm Drizzle la PostgreSQL
  *
  * Drizzle = traducătorul nostru
  * Noi scriem în TypeScript, Drizzle traduce în SQL (limbajul bazei de date)
  */
-export const db = drizzle(sqlite, { schema });
+export const db = drizzle(client, { schema });
 
 /**
  * EXPORT pentru a folosi în toată aplicația
