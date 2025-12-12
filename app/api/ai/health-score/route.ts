@@ -72,10 +72,11 @@ export async function GET(request: NextRequest) {
     let totalExpenses = 0;
 
     transactions.forEach((t) => {
-      if (t.amount > 0) {
-        totalIncome += t.amount;
+      const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
+      if (amount > 0) {
+        totalIncome += amount;
       } else {
-        totalExpenses += Math.abs(t.amount);
+        totalExpenses += Math.abs(amount);
       }
     });
 
@@ -89,8 +90,12 @@ export async function GET(request: NextRequest) {
 
     const categoryStats: Record<string, number> = {};
     transactions
-      .filter((t) => t.amount < 0) // Doar cheltuieli
+      .filter((t) => {
+        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
+        return amount < 0; // Doar cheltuieli
+      })
       .forEach((t) => {
+        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
         const category = categoryMap.get(t.categoryId || "");
         const categoryName = category?.name || "Necategorizat";
 
@@ -98,7 +103,7 @@ export async function GET(request: NextRequest) {
           categoryStats[categoryName] = 0;
         }
 
-        categoryStats[categoryName] += Math.abs(t.amount);
+        categoryStats[categoryName] += Math.abs(amount);
       });
 
     // Convertim în array cu procentaje

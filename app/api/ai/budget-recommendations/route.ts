@@ -87,6 +87,7 @@ export async function GET(request: NextRequest) {
     let totalExpenses = 0;
 
     transactions.forEach((t) => {
+      const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
       const category = categoryMap.get(t.categoryId || "");
       const categoryName = category?.name || "Necategorizat";
 
@@ -94,14 +95,14 @@ export async function GET(request: NextRequest) {
         categoryStats[categoryName] = { amount: 0, count: 0 };
       }
 
-      categoryStats[categoryName].amount += Math.abs(t.amount);
+      categoryStats[categoryName].amount += Math.abs(amount);
       categoryStats[categoryName].count += 1;
 
       // Calculăm total venituri vs cheltuieli
-      if (t.amount > 0) {
-        totalIncome += t.amount;
+      if (amount > 0) {
+        totalIncome += amount;
       } else {
-        totalExpenses += Math.abs(t.amount);
+        totalExpenses += Math.abs(amount);
       }
     });
 

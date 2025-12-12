@@ -121,7 +121,8 @@ export async function GET(request: NextRequest) {
     const categoryCounts: Record<string, number> = {};
 
     historicalTransactions.forEach((t) => {
-      if (t.amount >= 0) return; // Skip venituri
+      const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
+      if (amount >= 0) return; // Skip venituri
 
       const category = categoryMap.get(t.categoryId || "");
       const categoryName = category?.name || "Necategorizat";
@@ -131,7 +132,7 @@ export async function GET(request: NextRequest) {
         categoryCounts[categoryName] = 0;
       }
 
-      historicalAverage[categoryName] += Math.abs(t.amount);
+      historicalAverage[categoryName] += Math.abs(amount);
       categoryCounts[categoryName] += 1;
     });
 
@@ -142,12 +143,16 @@ export async function GET(request: NextRequest) {
 
     // PASUL 6: Pregătim recent transactions pentru AI
     const recentData = recentTransactions
-      .filter((t) => t.amount < 0) // Doar cheltuieli
+      .filter((t) => {
+        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
+        return amount < 0; // Doar cheltuieli
+      })
       .map((t) => {
+        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
         const category = categoryMap.get(t.categoryId || "");
         return {
           description: t.description,
-          amount: Math.abs(t.amount),
+          amount: Math.abs(amount),
           category: category?.name || "Necategorizat",
           date: t.date.toISOString().split("T")[0], // YYYY-MM-DD
         };
