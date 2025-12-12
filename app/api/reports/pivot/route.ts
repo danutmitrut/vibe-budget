@@ -139,7 +139,8 @@ export async function GET(request: NextRequest) {
       if (!row || !row.months[month]) return;
 
       // Adunăm sumele (în valoare absolută pentru cheltuieli)
-      const absAmount = Math.abs(tx.amount);
+      const amount = typeof tx.amount === 'string' ? parseFloat(tx.amount) : tx.amount;
+      const absAmount = Math.abs(amount);
       row.months[month].amount += absAmount;
       row.months[month].count += 1;
       row.total += absAmount;
