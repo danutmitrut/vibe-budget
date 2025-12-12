@@ -162,13 +162,9 @@ export async function POST(request: NextRequest) {
         categoryId, // Categorie auto-detectată sau null
         date: new Date(t.date),
         description: t.description,
-        amount: parseFloat(t.amount),
+        amount: String(parseFloat(t.amount)), // Convert to string for PostgreSQL decimal type
         currency: t.currency || user.nativeCurrency,
-        type: t.type || (parseFloat(t.amount) < 0 ? "debit" : "credit"),
-        source: t.source || "csv",
-        originalData: t.originalData ? JSON.stringify(t.originalData) : null,
-        isCategorized: categoryId !== null, // true dacă a fost categorizată automat
-        notes: t.notes || null,
+        // Removed: type, source, originalData, isCategorized, notes (not in PostgreSQL schema)
       };
     });
 
