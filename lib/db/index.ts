@@ -39,6 +39,7 @@ console.log(`[DB] Connecting to: ${debugConnStr}`);
 const client = postgres(connectionString, {
   prepare: false,
   max: 1, // Important pentru Vercel serverless
+  ssl: { rejectUnauthorized: false }, // Necesar pentru Supabase
 });
 
 /**
