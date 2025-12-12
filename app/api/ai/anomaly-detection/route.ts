@@ -180,12 +180,12 @@ export async function GET(request: NextRequest) {
       summary,
       period: {
         recent: {
-          startDate: sevenDaysAgo.toISOString(),
+          startDate: threeMonthsAgo.toISOString(),
           endDate: new Date().toISOString(),
         },
         historical: {
-          startDate: threeMonthsAgo.toISOString(),
-          endDate: sevenDaysAgo.toISOString(),
+          startDate: twelveMonthsAgo.toISOString(),
+          endDate: threeMonthsAgo.toISOString(),
         },
       },
     });
