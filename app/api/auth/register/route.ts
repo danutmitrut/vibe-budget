@@ -181,11 +181,17 @@ export async function POST(request: NextRequest) {
       },
       { status: 201 } // 201 = Created (resursă creată cu succes)
     );
-  } catch (error) {
+  } catch (error: any) {
     // Eroare server (ceva a mers prost)
     console.error("Register error:", error);
+
+    // TEMPORARY: Return detailed error for debugging in Vercel
     return NextResponse.json(
-      { error: "Eroare la înregistrare" },
+      {
+        error: "Eroare la înregistrare",
+        details: error?.message || String(error),
+        stack: process.env.NODE_ENV === 'development' ? error?.stack : undefined
+      },
       { status: 500 } // 500 = Internal Server Error
     );
   }
