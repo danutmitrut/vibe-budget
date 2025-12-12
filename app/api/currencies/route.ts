@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
       .values({
         userId: user.id,
         code: code.toUpperCase(),
+        name, // Adăugăm name care este required în schema
         symbol,
-        isNative: isNative || false,
       })
       .returning();
 
