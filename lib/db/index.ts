@@ -19,10 +19,12 @@ import * as schema from "./schema";
  * PASUL 1: Creăm conexiunea la Supabase PostgreSQL
  *
  * Connection string format:
- * postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres
+ * postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
  */
-const connectionString = process.env.DATABASE_URL ||
-  `postgresql://postgres.yctmwqwrwoeqdavqjnko:${process.env.SUPABASE_DB_PASSWORD}@aws-0-eu-central-1.pooler.supabase.com:6543/postgres`;
+if (!process.env.DATABASE_URL) {
+  throw new Error("DATABASE_URL environment variable is not set");
+}
+const connectionString = process.env.DATABASE_URL;
 
 /**
  * PASUL 2: Configurăm client-ul PostgreSQL
