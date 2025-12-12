@@ -55,13 +55,11 @@ export async function PATCH(
       );
     }
 
-    // Actualizăm tranzacția
+    // Actualizăm tranzacția (doar categoryId - notes și isCategorized nu există în PostgreSQL schema)
     const updated = await db
       .update(schema.transactions)
       .set({
         categoryId: body.categoryId || existing[0].categoryId,
-        notes: body.notes !== undefined ? body.notes : existing[0].notes,
-        isCategorized: body.categoryId ? true : existing[0].isCategorized,
       })
       .where(eq(schema.transactions.id, id))
       .returning();
