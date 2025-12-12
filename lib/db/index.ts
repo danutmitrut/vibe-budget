@@ -26,6 +26,10 @@ if (!process.env.DATABASE_URL) {
 }
 const connectionString = process.env.DATABASE_URL;
 
+// DEBUG: Log connection string (hide password)
+const debugConnStr = connectionString.replace(/:([^@]+)@/, ':****@');
+console.log(`[DB] Connecting to: ${debugConnStr}`);
+
 /**
  * PASUL 2: Configurăm client-ul PostgreSQL
  *
