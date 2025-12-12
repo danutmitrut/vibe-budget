@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
       }
 
       // Uncategorized
-      if (!t.isCategorized || !t.categoryId) {
+      if (!t.categoryId) {
         uncategorizedCount++;
       }
 
