@@ -21,10 +21,14 @@ import * as schema from "./schema";
  * Connection string format:
  * postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
  */
-if (!process.env.DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is not set");
+// TEMPORARY FIX: Hard-code connection string because Vercel is not picking up env var
+const connectionString = process.env.DATABASE_URL ||
+  "postgresql://postgres:Rasalgethi2025.@db.yctmwqwrwoeqdavqjnko.supabase.co:5432/postgres";
+
+if (!connectionString.includes("://")) {
+  console.error("⚠️ INVALID CONNECTION STRING - Missing ://");
+  console.error("Received:", connectionString);
 }
-const connectionString = process.env.DATABASE_URL;
 
 // DEBUG: Log connection string (hide password)
 const debugConnStr = connectionString.replace(/:([^@]+)@/, ':****@');
