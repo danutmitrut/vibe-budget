@@ -259,18 +259,12 @@ export default function UploadPage() {
             <p className="text-sm text-gray-800 mt-4">
               Formate acceptate: CSV, Excel (.xlsx, .xls)
             </p>
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-              <p className="text-xs text-blue-800">
-                <strong>📄 Ai PDF?</strong> Convertește-l gratuit în CSV pe{" "}
-                <a
-                  href="https://www.ilovepdf.com/pdf_to_excel"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="underline font-semibold hover:text-blue-600"
-                >
-                  ilovepdf.com
-                </a>{" "}
-                sau descarcă extractul direct în format CSV de la bancă.
+            <div className="mt-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs text-amber-900">
+                <strong>🔒 Securitate:</strong> Pentru protecția datelor tale financiare,{" "}
+                <strong className="text-amber-800">descarcă extractul direct în format CSV/Excel de la bancă</strong>{" "}
+                (ING, BCR, BRD, Revolut - toate oferă export CSV din aplicație).{" "}
+                <strong className="text-red-700">NU folosi convertoare online</strong> - riști expunerea tranzacțiilor tale!
               </p>
             </div>
           </div>
