@@ -394,17 +394,23 @@ function excelSerialToDate(serial: number): string {
 /**
  * Formatează data în format ISO (YYYY-MM-DD)
  */
-function formatDate(dateStr: string): string {
+function formatDate(dateStr: string | number): string {
   // DEBUG: Log intrare
   console.log('[formatDate] Input:', JSON.stringify(dateStr), 'Type:', typeof dateStr);
 
-  // Verificăm dacă e Excel serial number (număr > 40000 = post-2009)
-  const asNumber = parseFloat(dateStr);
+  // Verificăm dacă e Excel serial number (number sau string ce pare număr > 40000)
+  const asNumber = typeof dateStr === 'number' ? dateStr : parseFloat(String(dateStr));
   if (!isNaN(asNumber) && asNumber > 40000 && asNumber < 60000) {
     console.log('[formatDate] Excel serial number detected:', asNumber);
     const result = excelSerialToDate(asNumber);
     console.log('[formatDate] Converted to date:', result);
     return result;
+  }
+
+  // Dacă e number dar nu e Excel serial, e invalid
+  if (typeof dateStr === 'number') {
+    console.warn('[formatDate] Invalid number (not Excel serial):', dateStr);
+    return new Date().toISOString().split("T")[0];
   }
 
   // Validare: dacă nu primim string valid, returnăm data curentă
