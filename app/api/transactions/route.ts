@@ -171,7 +171,7 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         bankId: t.bankId || null,
         categoryId, // Categorie auto-detectată sau null
-        date: new Date(t.date),
+        date: t.date, // Keep as string (YYYY-MM-DD format)
         description: t.description,
         amount: parseFloat(t.amount), // PostgreSQL decimal with mode: 'number'
         currency: t.currency || user.nativeCurrency,

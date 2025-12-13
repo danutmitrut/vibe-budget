@@ -7,7 +7,7 @@
  * E ca un formular: fiecare coloană este un câmp de completat.
  */
 
-import { pgTable, text, boolean, timestamp, decimal } from "drizzle-orm/pg-core";
+import { pgTable, text, boolean, timestamp, decimal, date } from "drizzle-orm/pg-core";
 import { createId } from "@paralleldrive/cuid2";
 
 /**
@@ -178,7 +178,7 @@ export const transactions = pgTable("transactions", {
   categoryId: text("category_id").references(() => categories.id, {
     onDelete: "set null",
   }),
-  date: timestamp("date").notNull(), // Data tranzacției
+  date: date("date", { mode: 'string' }).notNull(), // Data tranzacției (YYYY-MM-DD)
   description: text("description").notNull(), // "MEGA IMAGE 123"
   amount: decimal("amount", { precision: 10, scale: 2, mode: 'number' }).notNull(), // -45.50 (negativ = cheltuială, pozitiv = venit)
   currency: text("currency").notNull().default("RON"), // RON, EUR, USD
