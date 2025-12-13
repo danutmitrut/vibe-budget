@@ -306,20 +306,6 @@ export default function DashboardPage() {
             </p>
           </Link>
         </div>
-
-        {/* Future features */}
-        <div className="bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl shadow-lg p-8 text-white">
-          <h3 className="text-2xl font-bold mb-4">🚀 Funcționalități viitoare</h3>
-          <p className="text-lg mb-2">
-            Următoarele funcționalități vor fi implementate:
-          </p>
-          <ul className="list-disc list-inside space-y-2 text-white/90">
-            <li>Categorizare automată cu AI (OpenAI)</li>
-            <li>Conversii valutare (exchange rates API)</li>
-            <li>Exportare rapoarte PDF</li>
-            <li>Notificări pentru bugete depășite</li>
-          </ul>
-        </div>
       </main>
     </div>
   );
