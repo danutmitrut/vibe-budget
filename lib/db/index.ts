@@ -21,13 +21,20 @@ import * as schema from "./schema";
  * Connection string format:
  * postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
  */
-// TEMPORARY FIX: Hard-code connection string because Vercel is not picking up env var
-const connectionString = process.env.DATABASE_URL ||
+// TEMPORARY FIX: Validate and fix malformed connection string from Vercel
+let connectionString = process.env.DATABASE_URL ||
   "postgresql://postgres:Rasalgethi2025.@db.yctmwqwrwoeqdavqjnko.supabase.co:5432/postgres";
 
-if (!connectionString.includes("://")) {
-  console.error("⚠️ INVALID CONNECTION STRING - Missing ://");
-  console.error("Received:", connectionString);
+// FIX: Vercel bug - missing //postgres after postgresql:
+// Expected: postgresql://postgres:password@host
+// Received: postgresql:password@host (WRONG!)
+if (connectionString.startsWith("postgresql:") && !connectionString.startsWith("postgresql://")) {
+  console.error("⚠️ VERCEL BUG DETECTED - Malformed DATABASE_URL");
+  console.error("Received:", connectionString.substring(0, 30) + "...");
+
+  // Fix: postgresql:password@host -> postgresql://postgres:password@host
+  connectionString = connectionString.replace("postgresql:", "postgresql://postgres:");
+  console.log("✅ AUTO-FIXED CONNECTION STRING");
 }
 
 // DEBUG: Log connection string (hide password)
