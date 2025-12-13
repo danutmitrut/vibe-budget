@@ -386,10 +386,24 @@ export default function TransactionsPage() {
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {(() => {
-                            // Parsăm data în format YYYY-MM-DD fără timezone conversion
-                            const dateStr = String(transaction.date);
-                            const [year, month, day] = dateStr.split('T')[0].split('-');
-                            return `${day}.${month}.${year}`;
+                            try {
+                              // Convertim la string și curățăm
+                              const dateStr = String(transaction.date).split('T')[0];
+
+                              // Verificăm dacă e format valid YYYY-MM-DD
+                              if (dateStr.includes('-')) {
+                                const [year, month, day] = dateStr.split('-');
+                                if (year && month && day) {
+                                  return `${day.padStart(2, '0')}.${month.padStart(2, '0')}.${year}`;
+                                }
+                              }
+
+                              // Fallback: folosim Date object
+                              return new Date(transaction.date).toLocaleDateString("ro-RO");
+                            } catch (e) {
+                              console.error('Date parse error:', transaction.date, e);
+                              return String(transaction.date);
+                            }
                           })()}
                         </td>
                         <td className="px-4 py-3 text-sm">
