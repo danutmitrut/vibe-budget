@@ -148,6 +148,11 @@ export async function parseExcel(file: File): Promise<ParseResult> {
         // Convertim în JSON
         const jsonData = XLSX.utils.sheet_to_json(worksheet);
 
+        console.log('[parseExcel] Sheet name:', sheetName);
+        console.log('[parseExcel] Total rows:', jsonData.length);
+        console.log('[parseExcel] First row sample:', jsonData[0]);
+        console.log('[parseExcel] Column headers:', Object.keys(jsonData[0] || {}));
+
         if (jsonData.length === 0) {
           resolve({
             success: false,
@@ -160,12 +165,22 @@ export async function parseExcel(file: File): Promise<ParseResult> {
         // Transformăm în tranzacții (similar cu CSV)
         const transactions: ParsedTransaction[] = [];
 
-        jsonData.forEach((row: any) => {
+        jsonData.forEach((row: any, index: number) => {
           try {
             const date = detectDate(row);
             const description = detectDescription(row);
             const amount = detectAmount(row);
             const currency = detectCurrency(row);
+
+            if (index < 3) {
+              console.log(`[parseExcel] Row ${index}:`, {
+                date,
+                description,
+                amount,
+                currency,
+                rawRow: row
+              });
+            }
 
             if (date && description && amount !== null) {
               transactions.push({
@@ -176,9 +191,18 @@ export async function parseExcel(file: File): Promise<ParseResult> {
                 type: parseFloat(amount) < 0 ? "debit" : "credit",
                 originalData: row,
               });
+            } else {
+              if (index < 5) {
+                console.warn(`[parseExcel] Skipping row ${index} - missing data:`, {
+                  hasDate: !!date,
+                  hasDescription: !!description,
+                  hasAmount: amount !== null,
+                  row
+                });
+              }
             }
           } catch (err) {
-            console.warn("Eroare la parsarea rândului:", err);
+            console.warn(`[parseExcel] Eroare la parsarea rândului ${index}:`, err);
           }
         });
 
