@@ -180,7 +180,7 @@ export const transactions = pgTable("transactions", {
   }),
   date: timestamp("date").notNull(), // Data tranzacției
   description: text("description").notNull(), // "MEGA IMAGE 123"
-  amount: decimal("amount", { precision: 10, scale: 2 }).notNull(), // -45.50 (negativ = cheltuială, pozitiv = venit)
+  amount: decimal("amount", { precision: 10, scale: 2, mode: 'number' }).notNull(), // -45.50 (negativ = cheltuială, pozitiv = venit)
   currency: text("currency").notNull().default("RON"), // RON, EUR, USD
   createdAt: timestamp("created_at")
     .notNull()
