@@ -139,7 +139,18 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
 
     // PASUL 2: Pregătim tranzacțiile pentru inserare cu AUTO-CATEGORIZARE
-    const transactionsToInsert = transactions.map((t) => {
+    const transactionsToInsert = transactions.map((t, index) => {
+      // DEBUG: Log first 3 transactions
+      if (index < 3) {
+        console.log(`[API] Transaction ${index}:`, {
+          date_received: t.date,
+          date_type: typeof t.date,
+          date_asDate: new Date(t.date).toISOString(),
+          description: t.description.substring(0, 30),
+          amount: t.amount
+        });
+      }
+
       // Încercăm să categorizăm automat pe bază de descriere
       const suggestedCategoryName = autoCategorizeByCategoryName(t.description);
       let categoryId: string | null = null;
