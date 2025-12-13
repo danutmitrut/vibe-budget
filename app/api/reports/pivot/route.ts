@@ -59,6 +59,7 @@ export async function GET(request: NextRequest) {
     startDate.setMonth(startDate.getMonth() - monthsCount);
     startDate.setDate(1); // Prima zi a lunii
     startDate.setHours(0, 0, 0, 0);
+    const startDateStr = startDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
 
     // Fetch toate tranzacțiile din ultimele N luni
     const transactions = await db
@@ -72,7 +73,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, startDate)
+          gte(schema.transactions.date, startDateStr)
         )
       );
 
