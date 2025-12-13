@@ -18,12 +18,12 @@ import * as schema from "./schema";
 /**
  * PASUL 1: Creăm conexiunea la Supabase PostgreSQL
  *
- * Connection string format:
- * postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
+ * Connection string format (Transaction Pooler - IPv4 compatible):
+ * postgresql://postgres.[project-ref]:[password]@aws-X-region.pooler.supabase.com:6543/postgres
  */
-// TEMPORARY FIX: Validate and fix malformed connection string from Vercel
+// Connection string with IPv4-compatible Transaction Pooler for Vercel
 let connectionString = process.env.DATABASE_URL ||
-  "postgresql://postgres:Rasalgethi2025.@db.yctmwqwrwoeqdavqjnko.supabase.co:5432/postgres";
+  "postgresql://postgres.yctmwqwrwoeqdavqjnko:Rasalgethi2025.@aws-1-eu-west-1.pooler.supabase.com:6543/postgres";
 
 // FIX: Vercel bug - missing //postgres after postgresql:
 // Expected: postgresql://postgres:password@host
@@ -42,9 +42,10 @@ if (connectionString.startsWith("postgresql:") && !connectionString.startsWith("
 }
 
 // DEBUG: Log connection string (hide password)
-const debugConnStr = connectionString.replace(/:([^@]+)@/, ':****@');
-console.log(`🔍 [BUILD v3] DB Connection String: ${debugConnStr}`);
-console.log(`🔍 [BUILD v3] Original env var: ${process.env.DATABASE_URL?.substring(0, 30)}...`);
+// Match only password part: postgresql://postgres:PASSWORD@host -> postgresql://postgres:****@host
+const debugConnStr = connectionString.replace(/(:\/\/[^:]+:)([^@]+)(@)/, '$1****$3');
+console.log(`🔍 [BUILD v4] DB Connection String: ${debugConnStr}`);
+console.log(`🔍 [BUILD v4] Original env var: ${process.env.DATABASE_URL?.substring(0, 35)}...`);
 
 /**
  * PASUL 2: Configurăm client-ul PostgreSQL
