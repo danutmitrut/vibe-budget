@@ -197,10 +197,11 @@ postgresql://postgres:[password]@db.[project-ref].supabase.co:5432/postgres
 
 ```env
 # Database connection string (Transaction Pooler - IPv4 compatible pentru Vercel)
-DATABASE_URL=postgresql://postgres.yctmwqwrwoeqdavqjnko:Rasalgethi2025.@aws-1-eu-west-1.pooler.supabase.com:6543/postgres
+DATABASE_URL=postgresql://postgres.PROJECT_REF:YOUR_SUPABASE_PASSWORD@aws-REGION.pooler.supabase.com:6543/postgres
 
 # JWT Secret - Cheie pentru semnarea token-urilor
-JWT_SECRET=r+14vbL8ssEAZRKN5QZuWCxEGVx/xUyOLS1PatjFvHs=
+# Generează cu: openssl rand -base64 32
+JWT_SECRET=YOUR_JWT_SECRET_HERE
 
 # Supabase - Pentru client-side authentication (optional)
 NEXT_PUBLIC_SUPABASE_URL=https://yctmwqwrwoeqdavqjnko.supabase.co
