@@ -2,16 +2,18 @@
  * UTILITĂȚI PARSARE FIȘIERE
  *
  * EXPLICAȚIE:
- * Funcții pentru parsarea fișierelor CSV și Excel în tranzacții.
+ * Funcții pentru parsarea fișierelor CSV, Excel și PDF în tranzacții.
  *
  * CONCEPTE:
  * - CSV = Comma-Separated Values (valori separate prin virgulă)
  * - Excel = Format binar (.xlsx) al Microsoft
+ * - PDF = Portable Document Format (extrase bancare)
  * - Parser = Funcție care transformă text/binary în obiecte JavaScript
  */
 
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import pdf from "pdf-parse";
 
 /**
  * Tipul pentru o tranzacție parsată
@@ -208,6 +210,159 @@ export async function parseExcel(file: File): Promise<ParseResult> {
 }
 
 /**
+ * FUNCȚIA 3: Parse PDF
+ *
+ * Parsează un fișier PDF (extrase bancare) și extrage tranzacțiile.
+ *
+ * BĂNCI SUPORTATE:
+ * - ING Bank Romania (format standard)
+ * - BCR (format standard)
+ * - BRD (format standard)
+ * - Revolut (format standard)
+ *
+ * IMPORTANT: PDF-urile trebuie să fie text-based, nu scanări (imagini).
+ */
+export async function parsePDF(file: File): Promise<ParseResult> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+
+    reader.onload = async (e) => {
+      try {
+        const arrayBuffer = e.target?.result as ArrayBuffer;
+        if (!arrayBuffer) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: "Nu s-a putut citi fișierul PDF",
+          });
+          return;
+        }
+
+        // Parsăm PDF-ul
+        const data = await pdf(Buffer.from(arrayBuffer));
+        const text = data.text;
+
+        console.log('[parsePDF] Extracted text length:', text.length);
+        console.log('[parsePDF] First 500 chars:', text.substring(0, 500));
+
+        if (!text || text.trim().length === 0) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: "PDF-ul este gol sau este o imagine scanată (nu conține text)",
+          });
+          return;
+        }
+
+        // Parsăm textul în tranzacții folosind pattern matching
+        const transactions = parsePDFTextToTransactions(text);
+
+        if (transactions.length === 0) {
+          resolve({
+            success: false,
+            transactions: [],
+            error: "Nu s-au putut extrage tranzacții din PDF. Format nesuportat sau PDF scanat.",
+          });
+          return;
+        }
+
+        resolve({
+          success: true,
+          transactions,
+          rowCount: transactions.length,
+        });
+      } catch (error: any) {
+        console.error('[parsePDF] Error:', error);
+        resolve({
+          success: false,
+          transactions: [],
+          error: error.message || "Eroare la parsarea PDF-ului",
+        });
+      }
+    };
+
+    reader.onerror = () => {
+      resolve({
+        success: false,
+        transactions: [],
+        error: "Eroare la citirea fișierului PDF",
+      });
+    };
+
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+/**
+ * HELPER: Parsează textul extras din PDF în tranzacții
+ *
+ * Caută pattern-uri comune în extrase bancare:
+ * - Data (DD.MM.YYYY sau DD/MM/YYYY)
+ * - Suma (cu - sau + prefix, sau coloane separate Debit/Credit)
+ * - Descriere
+ */
+function parsePDFTextToTransactions(text: string): ParsedTransaction[] {
+  const transactions: ParsedTransaction[] = [];
+  const lines = text.split('\n');
+
+  console.log('[parsePDFText] Processing', lines.length, 'lines');
+
+  // Pattern pentru ING/BCR/BRD: DD.MM.YYYY ... Descriere ... -123.45 RON
+  // Pattern pentru Revolut: DD MMM YYYY ... Descriere ... -123.45 RON
+  const patterns = [
+    // Pattern 1: DD.MM.YYYY sau DD/MM/YYYY la început de linie
+    /^(\d{2}[.\/]\d{2}[.\/]\d{4})\s+(.+?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?/,
+
+    // Pattern 2: Revolut style - DD MMM YYYY
+    /^(\d{2}\s+\w{3}\s+\d{4})\s+(.+?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?/,
+
+    // Pattern 3: Format cu descriere mai lungă
+    /(\d{2}[.\/]\d{2}[.\/]\d{4})\s+(.{10,}?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?$/,
+  ];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+
+    // Skip linii goale sau prea scurte
+    if (line.length < 10) continue;
+
+    for (const pattern of patterns) {
+      const match = line.match(pattern);
+
+      if (match) {
+        try {
+          const dateStr = match[1];
+          const description = match[2].trim();
+          const amountStr = match[3].replace(',', '.'); // RON folosește virgulă
+          const currency = match[4] || 'RON';
+
+          // Validări
+          if (!description || description.length < 3) continue;
+          if (isNaN(parseFloat(amountStr))) continue;
+
+          const amount = parseFloat(amountStr);
+
+          transactions.push({
+            date: formatDate(dateStr),
+            description: description.substring(0, 200), // Limitează lungimea
+            amount: amount,
+            currency: currency,
+            type: amount < 0 ? 'debit' : 'credit',
+          });
+
+          console.log(`[parsePDFText] Found transaction: ${dateStr} | ${description.substring(0, 30)} | ${amount} ${currency}`);
+          break; // Am găsit match, trecem la următoarea linie
+        } catch (err) {
+          console.warn('[parsePDFText] Failed to parse line:', line, err);
+        }
+      }
+    }
+  }
+
+  return transactions;
+}
+
+/**
  * FUNCȚII HELPER - Detectare automată coloane
  *
  * Aceste funcții încearcă să ghicească care coloană conține ce informație.
@@ -338,6 +493,29 @@ function formatDate(dateStr: string): string {
     const result = cleanStr.split(" ")[0].split("T")[0];
     console.log('[formatDate] ISO format detected. Result:', result);
     return result;
+  }
+
+  // Format Revolut: DD MMM YYYY (ex: "01 Dec 2024")
+  const revolutPattern = /^(\d{2})\s+(\w{3})\s+(\d{4})$/;
+  const revolutMatch = cleanStr.match(revolutPattern);
+
+  if (revolutMatch) {
+    const monthMap: { [key: string]: string } = {
+      'Jan': '01', 'Feb': '02', 'Mar': '03', 'Apr': '04',
+      'May': '05', 'Jun': '06', 'Jul': '07', 'Aug': '08',
+      'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dec': '12'
+    };
+
+    const day = revolutMatch[1];
+    const monthName = revolutMatch[2];
+    const year = revolutMatch[3];
+    const month = monthMap[monthName];
+
+    if (month) {
+      const result = `${year}-${month}-${day}`;
+      console.log('[formatDate] Revolut format detected. Result:', result);
+      return result;
+    }
   }
 
   // Parsăm formate românești: DD.MM.YYYY sau DD/MM/YYYY

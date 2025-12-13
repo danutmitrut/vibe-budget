@@ -10,7 +10,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { parseCSV, parseExcel, ParsedTransaction } from "@/lib/utils/file-parser";
+import { parseCSV, parseExcel, parsePDF, ParsedTransaction } from "@/lib/utils/file-parser";
 
 interface Bank {
   id: string;
@@ -99,8 +99,10 @@ export default function UploadPage() {
         result = await parseCSV(selectedFile);
       } else if (fileType === "xlsx" || fileType === "xls") {
         result = await parseExcel(selectedFile);
+      } else if (fileType === "pdf") {
+        result = await parsePDF(selectedFile);
       } else {
-        throw new Error("Format nesuportat. Folosește CSV sau Excel (.xlsx)");
+        throw new Error("Format nesuportat. Folosește CSV, Excel (.xlsx) sau PDF");
       }
 
       if (!result.success) {
@@ -251,13 +253,13 @@ export default function UploadPage() {
               Alege fișier
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls"
+                accept=".csv,.xlsx,.xls,.pdf"
                 onChange={handleFileInput}
                 className="hidden"
               />
             </label>
             <p className="text-sm text-gray-800 mt-4">
-              Formate acceptate: CSV, Excel (.xlsx, .xls)
+              Formate acceptate: CSV, Excel (.xlsx, .xls), PDF (extrase bancare)
             </p>
           </div>
 
