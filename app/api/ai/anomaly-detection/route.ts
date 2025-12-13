@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
     // PASUL 2: Colectăm tranzacții recente (ultimele 3 luni)
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+    const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
 
     const recentTransactions = await db
       .select()
@@ -62,13 +63,14 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, threeMonthsAgo)
+          gte(schema.transactions.date, threeMonthsAgoStr)
         )
       );
 
     // PASUL 3: Colectăm date istorice (ultimele 12 luni)
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
 
     const historicalTransactions = await db
       .select()
@@ -76,8 +78,8 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, twelveMonthsAgo),
-          lte(schema.transactions.date, threeMonthsAgo) // Exclude recent pentru calcul medie
+          gte(schema.transactions.date, twelveMonthsAgoStr),
+          lte(schema.transactions.date, threeMonthsAgoStr) // Exclude recent pentru calcul medie
         )
       );
 

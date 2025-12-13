@@ -59,11 +59,11 @@ export async function GET(request: NextRequest) {
     }
 
     if (startDate) {
-      conditions.push(gte(schema.transactions.date, new Date(startDate)));
+      conditions.push(gte(schema.transactions.date, startDate));
     }
 
     if (endDate) {
-      conditions.push(lte(schema.transactions.date, new Date(endDate)));
+      conditions.push(lte(schema.transactions.date, endDate));
     }
 
     const transactions = await db

@@ -53,8 +53,8 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, new Date(startDate)),
-          lte(schema.transactions.date, new Date(endDate))
+          gte(schema.transactions.date, startDate),
+          lte(schema.transactions.date, endDate)
         )
       );
 

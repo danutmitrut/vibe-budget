@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, twelveMonthsAgo)
+          gte(schema.transactions.date, twelveMonthsAgo.toISOString().split("T")[0])
         )
       );
 
