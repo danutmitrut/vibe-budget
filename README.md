@@ -20,7 +20,8 @@ Modern personal finance management application built with Next.js 16, featuring 
 - **Tailwind CSS 4** - Modern styling
 - **Anthropic Claude Sonnet 4.5** - AI integration
 - **Drizzle ORM** - Type-safe database
-- **SQLite** - Local database
+- **Supabase PostgreSQL** - Production database (cloud)
+- **SQLite** - Local development (optional)
 
 ## 📦 Installation
 
@@ -79,32 +80,36 @@ npx tsx scripts/create-test-user.ts
 npx tsx scripts/add-december-to-existing-user.ts test@vibe-budget.com
 ```
 
-## 🚀 Deploy to Vercel
+## 🚀 Deploy to Vercel + Supabase
 
-1. **Push to GitHub**
-```bash
-git init
-git add .
-git commit -m "Initial commit"
-git branch -M main
-git remote add origin https://github.com/yourusername/vibe-budget.git
-git push -u origin main
-```
+**📚 Complete Deployment Guide:** [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md)
 
-2. **Import to Vercel**
-   - Go to [vercel.com](https://vercel.com)
-   - Click "Import Project"
-   - Select your repository
+**Quick Start:**
 
-3. **Set Environment Variables in Vercel**
+1. **Setup Supabase Database**
+   - Create Supabase project
+   - Run SQL schema (see [docs/DEPLOYMENT_GUIDE.md](docs/DEPLOYMENT_GUIDE.md))
+   - Get **Transaction Pooler** connection string (IPv4 compatible!)
 
-   Go to Settings → Environment Variables:
-   ```
-   JWT_SECRET=<generate-new-secret>
-   ANTHROPIC_API_KEY=<your-claude-key>
+2. **Push to GitHub**
+   ```bash
+   git push origin main
    ```
 
-4. **Deploy** - Click Deploy and wait 2-3 minutes
+3. **Deploy to Vercel**
+   - Import repository on [vercel.com](https://vercel.com)
+   - Set environment variables:
+     - `DATABASE_URL` - Supabase Transaction Pooler connection string
+     - `JWT_SECRET` - Generate with `openssl rand -base64 32`
+     - `ANTHROPIC_API_KEY` - Your Claude API key
+   - Deploy!
+
+**⚠️ Important:** Use **Transaction Pooler** (port 6543), NOT Direct Connection (port 5432)!
+
+**📖 More Resources:**
+- [Database Configuration Guide](docs/DATABASE_SETUP.md)
+- [Troubleshooting Common Errors](docs/TROUBLESHOOTING.md)
+- [Documentation Index](docs/README.md)
 
 ## 📊 AI Features
 
