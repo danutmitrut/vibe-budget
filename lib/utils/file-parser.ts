@@ -304,9 +304,13 @@ function detectAmount(row: any): string | null {
   // Adăugăm "sumă" cu diacritice pentru Revolut România
   const amountKeys = ["sumă", "suma", "amount", "valoare", "value", "total"];
 
+  // DEBUG: Afișăm toate cheile pentru a vedea ce primim exact
+  console.log('[detectAmount] All keys in row:', Object.keys(row).map(k => `"${k}"`));
+
   // Căutăm o coloană cu suma
   for (const key of Object.keys(row)) {
-    const lowerKey = key.toLowerCase();
+    const lowerKey = key.toLowerCase().trim(); // Adăugăm trim() pentru spații
+    console.log('[detectAmount] Checking key:', `"${key}"`, '→ lowercase:', `"${lowerKey}"`);
     if (amountKeys.some((k) => lowerKey.includes(k))) {
       console.log('[detectAmount] Found amount column:', key, '→', row[key]);
       return row[key];
