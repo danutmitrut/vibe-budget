@@ -10,7 +10,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { parseCSV, parseExcel, parsePDF, ParsedTransaction } from "@/lib/utils/file-parser";
+import { parseCSV, parseExcel, ParsedTransaction } from "@/lib/utils/file-parser";
 
 interface Bank {
   id: string;
@@ -99,10 +99,8 @@ export default function UploadPage() {
         result = await parseCSV(selectedFile);
       } else if (fileType === "xlsx" || fileType === "xls") {
         result = await parseExcel(selectedFile);
-      } else if (fileType === "pdf") {
-        result = await parsePDF(selectedFile);
       } else {
-        throw new Error("Format nesuportat. Folosește CSV, Excel (.xlsx) sau PDF");
+        throw new Error("Format nesuportat. Folosește CSV sau Excel (.xlsx, .xls)");
       }
 
       if (!result.success) {
@@ -253,14 +251,28 @@ export default function UploadPage() {
               Alege fișier
               <input
                 type="file"
-                accept=".csv,.xlsx,.xls,.pdf"
+                accept=".csv,.xlsx,.xls"
                 onChange={handleFileInput}
                 className="hidden"
               />
             </label>
             <p className="text-sm text-gray-800 mt-4">
-              Formate acceptate: CSV, Excel (.xlsx, .xls), PDF (extrase bancare)
+              Formate acceptate: CSV, Excel (.xlsx, .xls)
             </p>
+            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-xs text-blue-800">
+                <strong>📄 Ai PDF?</strong> Convertește-l gratuit în CSV pe{" "}
+                <a
+                  href="https://www.ilovepdf.com/pdf_to_excel"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="underline font-semibold hover:text-blue-600"
+                >
+                  ilovepdf.com
+                </a>{" "}
+                sau descarcă extractul direct în format CSV de la bancă.
+              </p>
+            </div>
           </div>
 
           {parsing && (

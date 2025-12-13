@@ -209,51 +209,21 @@ export async function parseExcel(file: File): Promise<ParseResult> {
 }
 
 /**
- * FUNCȚIA 3: Parse PDF
+ * FUNCȚIA 3: Parse PDF - TEMPORAR DEZACTIVATĂ
  *
- * Parsează un fișier PDF (extrase bancare) și extrage tranzacțiile.
+ * PDF parsing este complex în environment serverless.
  *
- * IMPORTANT: PDF parsing se face pe server (API endpoint)
- * deoarece biblioteca pdf-parse funcționează doar în Node.js
- *
- * BĂNCI SUPORTATE:
- * - ING Bank Romania (format standard)
- * - BCR (format standard)
- * - BRD (format standard)
- * - Revolut (format standard)
- *
- * IMPORTANT: PDF-urile trebuie să fie text-based, nu scanări (imagini).
+ * ALTERNATIVE PENTRU UTILIZATORI:
+ * 1. Convertiți PDF → CSV folosind https://www.ilovepdf.com/pdf_to_excel
+ * 2. Majoritatea băncilor oferă export CSV direct din aplicație
+ * 3. Folosiți Google Sheets pentru a deschide PDF și exporta ca CSV
  */
 export async function parsePDF(file: File): Promise<ParseResult> {
-  try {
-    // Trimitem fișierul la API endpoint pentru parsare server-side
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch('/api/parse-pdf', {
-      method: 'POST',
-      body: formData,
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      return {
-        success: false,
-        transactions: [],
-        error: data.error || 'Eroare la parsarea PDF-ului',
-      };
-    }
-
-    return data;
-  } catch (error: any) {
-    console.error('[parsePDF] Error:', error);
-    return {
-      success: false,
-      transactions: [],
-      error: error.message || 'Eroare la parsarea PDF-ului',
-    };
-  }
+  return {
+    success: false,
+    transactions: [],
+    error: 'PDF support este temporar indisponibil. Vă rugăm să convertești PDF-ul în CSV folosind https://www.ilovepdf.com/pdf_to_excel sau să descărcați extractul direct în format CSV de la bancă.',
+  };
 }
 
 /**
