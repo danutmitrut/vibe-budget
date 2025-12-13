@@ -315,14 +315,23 @@ function isDate(str: string): boolean {
  * Formatează data în format ISO (YYYY-MM-DD)
  */
 function formatDate(dateStr: string): string {
+  // Validare: dacă nu primim string valid, returnăm data curentă
+  if (!dateStr || typeof dateStr !== 'string') {
+    console.warn('Invalid date string:', dateStr);
+    return new Date().toISOString().split("T")[0];
+  }
+
+  // Curățăm string-ul (trim whitespace)
+  const cleanStr = dateStr.trim();
+
   // Dacă e deja ISO format (cu sau fără timestamp)
-  if (/^\d{4}-\d{2}-\d{2}/.test(dateStr)) {
+  if (/^\d{4}-\d{2}-\d{2}/.test(cleanStr)) {
     // Extragem doar partea de dată (fără timestamp)
-    return dateStr.split(" ")[0];
+    return cleanStr.split(" ")[0].split("T")[0];
   }
 
   // Parsăm formate românești: DD.MM.YYYY sau DD/MM/YYYY
-  const parts = dateStr.split(/[./-]/);
+  const parts = cleanStr.split(/[./-]/);
 
   if (parts.length === 3) {
     const [day, month, year] = parts;
@@ -330,6 +339,7 @@ function formatDate(dateStr: string): string {
     return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
   }
 
-  // Fallback: returnăm data curentă
+  // Fallback: returnăm data curentă (cu warning)
+  console.warn('Could not parse date, using current date:', dateStr);
   return new Date().toISOString().split("T")[0];
 }
