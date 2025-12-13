@@ -311,8 +311,10 @@ function detectAmount(row: any): string | null {
     // Normalizăm: lowercase + trim spații invizibile
     const normalizedKey = key.toLowerCase().trim();
 
-    if (amountKeys.some((k) => normalizedKey.includes(k))) {
-      console.log('[detectAmount] Found amount column:', key, '→', row[key]);
+    // DEBUG: Verificăm fiecare cheie
+    const matches = amountKeys.filter(k => normalizedKey.includes(k));
+    if (matches.length > 0) {
+      console.log('[detectAmount] ✅ MATCH! Key:', `"${key}"`, '→ normalized:', `"${normalizedKey}"`, '→ matched:', matches);
       return row[key];
     }
   }
