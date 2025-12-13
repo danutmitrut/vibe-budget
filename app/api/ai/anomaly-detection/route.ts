@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
           description: t.description,
           amount: Math.abs(amount),
           category: category?.name || "Necategorizat",
-          date: t.date.toISOString().split("T")[0], // YYYY-MM-DD
+          date: t.date, // Already in YYYY-MM-DD format
         };
       });
 
