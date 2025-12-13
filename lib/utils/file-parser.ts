@@ -13,7 +13,6 @@
 
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
-import pdf from "pdf-parse";
 
 /**
  * Tipul pentru o tranzacție parsată
@@ -214,6 +213,9 @@ export async function parseExcel(file: File): Promise<ParseResult> {
  *
  * Parsează un fișier PDF (extrase bancare) și extrage tranzacțiile.
  *
+ * IMPORTANT: PDF parsing se face pe server (API endpoint)
+ * deoarece biblioteca pdf-parse funcționează doar în Node.js
+ *
  * BĂNCI SUPORTATE:
  * - ING Bank Romania (format standard)
  * - BCR (format standard)
@@ -223,143 +225,35 @@ export async function parseExcel(file: File): Promise<ParseResult> {
  * IMPORTANT: PDF-urile trebuie să fie text-based, nu scanări (imagini).
  */
 export async function parsePDF(file: File): Promise<ParseResult> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
+  try {
+    // Trimitem fișierul la API endpoint pentru parsare server-side
+    const formData = new FormData();
+    formData.append('file', file);
 
-    reader.onload = async (e) => {
-      try {
-        const arrayBuffer = e.target?.result as ArrayBuffer;
-        if (!arrayBuffer) {
-          resolve({
-            success: false,
-            transactions: [],
-            error: "Nu s-a putut citi fișierul PDF",
-          });
-          return;
-        }
+    const response = await fetch('/api/parse-pdf', {
+      method: 'POST',
+      body: formData,
+    });
 
-        // Parsăm PDF-ul
-        const data = await pdf(Buffer.from(arrayBuffer));
-        const text = data.text;
+    const data = await response.json();
 
-        console.log('[parsePDF] Extracted text length:', text.length);
-        console.log('[parsePDF] First 500 chars:', text.substring(0, 500));
-
-        if (!text || text.trim().length === 0) {
-          resolve({
-            success: false,
-            transactions: [],
-            error: "PDF-ul este gol sau este o imagine scanată (nu conține text)",
-          });
-          return;
-        }
-
-        // Parsăm textul în tranzacții folosind pattern matching
-        const transactions = parsePDFTextToTransactions(text);
-
-        if (transactions.length === 0) {
-          resolve({
-            success: false,
-            transactions: [],
-            error: "Nu s-au putut extrage tranzacții din PDF. Format nesuportat sau PDF scanat.",
-          });
-          return;
-        }
-
-        resolve({
-          success: true,
-          transactions,
-          rowCount: transactions.length,
-        });
-      } catch (error: any) {
-        console.error('[parsePDF] Error:', error);
-        resolve({
-          success: false,
-          transactions: [],
-          error: error.message || "Eroare la parsarea PDF-ului",
-        });
-      }
-    };
-
-    reader.onerror = () => {
-      resolve({
+    if (!response.ok) {
+      return {
         success: false,
         transactions: [],
-        error: "Eroare la citirea fișierului PDF",
-      });
-    };
-
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-/**
- * HELPER: Parsează textul extras din PDF în tranzacții
- *
- * Caută pattern-uri comune în extrase bancare:
- * - Data (DD.MM.YYYY sau DD/MM/YYYY)
- * - Suma (cu - sau + prefix, sau coloane separate Debit/Credit)
- * - Descriere
- */
-function parsePDFTextToTransactions(text: string): ParsedTransaction[] {
-  const transactions: ParsedTransaction[] = [];
-  const lines = text.split('\n');
-
-  console.log('[parsePDFText] Processing', lines.length, 'lines');
-
-  // Pattern pentru ING/BCR/BRD: DD.MM.YYYY ... Descriere ... -123.45 RON
-  // Pattern pentru Revolut: DD MMM YYYY ... Descriere ... -123.45 RON
-  const patterns = [
-    // Pattern 1: DD.MM.YYYY sau DD/MM/YYYY la început de linie
-    /^(\d{2}[.\/]\d{2}[.\/]\d{4})\s+(.+?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?/,
-
-    // Pattern 2: Revolut style - DD MMM YYYY
-    /^(\d{2}\s+\w{3}\s+\d{4})\s+(.+?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?/,
-
-    // Pattern 3: Format cu descriere mai lungă
-    /(\d{2}[.\/]\d{2}[.\/]\d{4})\s+(.{10,}?)\s+([-+]?\d+[,.]?\d*)\s*(\w{3})?$/,
-  ];
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i].trim();
-
-    // Skip linii goale sau prea scurte
-    if (line.length < 10) continue;
-
-    for (const pattern of patterns) {
-      const match = line.match(pattern);
-
-      if (match) {
-        try {
-          const dateStr = match[1];
-          const description = match[2].trim();
-          const amountStr = match[3].replace(',', '.'); // RON folosește virgulă
-          const currency = match[4] || 'RON';
-
-          // Validări
-          if (!description || description.length < 3) continue;
-          if (isNaN(parseFloat(amountStr))) continue;
-
-          const amount = parseFloat(amountStr);
-
-          transactions.push({
-            date: formatDate(dateStr),
-            description: description.substring(0, 200), // Limitează lungimea
-            amount: amount,
-            currency: currency,
-            type: amount < 0 ? 'debit' : 'credit',
-          });
-
-          console.log(`[parsePDFText] Found transaction: ${dateStr} | ${description.substring(0, 30)} | ${amount} ${currency}`);
-          break; // Am găsit match, trecem la următoarea linie
-        } catch (err) {
-          console.warn('[parsePDFText] Failed to parse line:', line, err);
-        }
-      }
+        error: data.error || 'Eroare la parsarea PDF-ului',
+      };
     }
-  }
 
-  return transactions;
+    return data;
+  } catch (error: any) {
+    console.error('[parsePDF] Error:', error);
+    return {
+      success: false,
+      transactions: [],
+      error: error.message || 'Eroare la parsarea PDF-ului',
+    };
+  }
 }
 
 /**
