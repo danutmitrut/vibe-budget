@@ -285,25 +285,30 @@ function detectDate(row: any): string | null {
 }
 
 function detectDescription(row: any): string | null {
+  // Adăugăm variante cu diacritice pentru Revolut România
   const descKeys = ["descriere", "description", "detalii", "details", "beneficiar"];
 
   for (const key of Object.keys(row)) {
     const lowerKey = key.toLowerCase();
     if (descKeys.some((k) => lowerKey.includes(k))) {
+      console.log('[detectDescription] Found description column:', key, '→', row[key]);
       return row[key];
     }
   }
 
+  console.warn('[detectDescription] No description found in row:', Object.keys(row));
   return null;
 }
 
 function detectAmount(row: any): string | null {
-  const amountKeys = ["suma", "amount", "valoare", "value", "total"];
+  // Adăugăm "sumă" cu diacritice pentru Revolut România
+  const amountKeys = ["sumă", "suma", "amount", "valoare", "value", "total"];
 
   // Căutăm o coloană cu suma
   for (const key of Object.keys(row)) {
     const lowerKey = key.toLowerCase();
     if (amountKeys.some((k) => lowerKey.includes(k))) {
+      console.log('[detectAmount] Found amount column:', key, '→', row[key]);
       return row[key];
     }
   }
@@ -328,12 +333,15 @@ function detectAmount(row: any): string | null {
   // Dacă avem Debit/Credit, returnăm valoarea care nu e goală
   // Debit = negativ (cheltuială), Credit = pozitiv (venit)
   if (debitValue && debitValue.trim() !== "") {
+    console.log('[detectAmount] Found debit value:', debitValue);
     return `-${debitValue}`;
   }
   if (creditValue && creditValue.trim() !== "") {
+    console.log('[detectAmount] Found credit value:', creditValue);
     return creditValue;
   }
 
+  console.warn('[detectAmount] No amount found in row:', Object.keys(row));
   return null;
 }
 
