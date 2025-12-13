@@ -222,17 +222,21 @@ function detectDate(row: any): string | null {
   for (const key of Object.keys(row)) {
     const lowerKey = key.toLowerCase();
     if (dateKeys.some((k) => lowerKey.includes(k))) {
-      return row[key];
+      const dateValue = row[key];
+      console.log('[detectDate] Found date column:', key, '→', JSON.stringify(dateValue));
+      return dateValue;
     }
   }
 
   // Dacă nu găsim, luăm prima coloană care arată ca o dată
   for (const value of Object.values(row)) {
     if (typeof value === "string" && isDate(value)) {
+      console.log('[detectDate] Found date by pattern:', JSON.stringify(value));
       return value;
     }
   }
 
+  console.warn('[detectDate] No date found in row:', row);
   return null;
 }
 
@@ -315,31 +319,40 @@ function isDate(str: string): boolean {
  * Formatează data în format ISO (YYYY-MM-DD)
  */
 function formatDate(dateStr: string): string {
+  // DEBUG: Log intrare
+  console.log('[formatDate] Input:', JSON.stringify(dateStr), 'Type:', typeof dateStr);
+
   // Validare: dacă nu primim string valid, returnăm data curentă
   if (!dateStr || typeof dateStr !== 'string') {
-    console.warn('Invalid date string:', dateStr);
+    console.warn('[formatDate] Invalid date string:', dateStr);
     return new Date().toISOString().split("T")[0];
   }
 
   // Curățăm string-ul (trim whitespace)
   const cleanStr = dateStr.trim();
+  console.log('[formatDate] After trim:', JSON.stringify(cleanStr));
 
   // Dacă e deja ISO format (cu sau fără timestamp)
   if (/^\d{4}-\d{2}-\d{2}/.test(cleanStr)) {
     // Extragem doar partea de dată (fără timestamp)
-    return cleanStr.split(" ")[0].split("T")[0];
+    const result = cleanStr.split(" ")[0].split("T")[0];
+    console.log('[formatDate] ISO format detected. Result:', result);
+    return result;
   }
 
   // Parsăm formate românești: DD.MM.YYYY sau DD/MM/YYYY
   const parts = cleanStr.split(/[./-]/);
+  console.log('[formatDate] Parsed parts:', parts);
 
   if (parts.length === 3) {
     const [day, month, year] = parts;
     const fullYear = year.length === 2 ? `20${year}` : year;
-    return `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    const result = `${fullYear}-${month.padStart(2, "0")}-${day.padStart(2, "0")}`;
+    console.log('[formatDate] Romanian format detected. Result:', result);
+    return result;
   }
 
   // Fallback: returnăm data curentă (cu warning)
-  console.warn('Could not parse date, using current date:', dateStr);
+  console.warn('[formatDate] Could not parse date, using current date:', dateStr);
   return new Date().toISOString().split("T")[0];
 }
