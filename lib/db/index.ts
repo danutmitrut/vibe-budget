@@ -28,18 +28,23 @@ let connectionString = process.env.DATABASE_URL ||
 // FIX: Vercel bug - missing //postgres after postgresql:
 // Expected: postgresql://postgres:password@host
 // Received: postgresql:password@host (WRONG!)
+console.log(`🔍 [BUILD v3] Checking connection string...`);
+console.log(`🔍 [BUILD v3] Starts with "postgresql:": ${connectionString.startsWith("postgresql:")}`);
+console.log(`🔍 [BUILD v3] Starts with "postgresql://": ${connectionString.startsWith("postgresql://")}`);
+
 if (connectionString.startsWith("postgresql:") && !connectionString.startsWith("postgresql://")) {
-  console.error("⚠️ VERCEL BUG DETECTED - Malformed DATABASE_URL");
+  console.error("⚠️ [BUILD v3] VERCEL BUG DETECTED - Malformed DATABASE_URL");
   console.error("Received:", connectionString.substring(0, 30) + "...");
 
   // Fix: postgresql:password@host -> postgresql://postgres:password@host
   connectionString = connectionString.replace("postgresql:", "postgresql://postgres:");
-  console.log("✅ AUTO-FIXED CONNECTION STRING");
+  console.log("✅ [BUILD v3] AUTO-FIXED CONNECTION STRING");
 }
 
 // DEBUG: Log connection string (hide password)
 const debugConnStr = connectionString.replace(/:([^@]+)@/, ':****@');
-console.log(`[DB] Connecting to: ${debugConnStr}`);
+console.log(`🔍 [BUILD v3] DB Connection String: ${debugConnStr}`);
+console.log(`🔍 [BUILD v3] Original env var: ${process.env.DATABASE_URL?.substring(0, 30)}...`);
 
 /**
  * PASUL 2: Configurăm client-ul PostgreSQL
