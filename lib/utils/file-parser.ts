@@ -261,11 +261,12 @@ function detectDate(row: any): string | null {
   // Căutăm o coloană care arată ca o dată
   // Adăugăm "completed" pentru Revolut (Completed Date)
   // Adăugăm "început" pentru Revolut România (Data de început)
-  const dateKeys = ["completed", "data", "date", "început", "inceput", "start", "data operatiunii", "data tranzactiei"];
+  // NOTĂ: Excel exportă "Ä" în loc de "Ă" pentru caracterele românești
+  const dateKeys = ["completed", "data", "date", "început", "inceput", "änceput", "start", "data operatiunii", "data tranzactiei"];
 
   for (const key of Object.keys(row)) {
-    const lowerKey = key.toLowerCase();
-    if (dateKeys.some((k) => lowerKey.includes(k))) {
+    const normalizedKey = key.toLowerCase().trim();
+    if (dateKeys.some((k) => normalizedKey.includes(k))) {
       const dateValue = row[key];
       console.log('[detectDate] Found date column:', key, '→', JSON.stringify(dateValue));
       return dateValue;
@@ -289,8 +290,8 @@ function detectDescription(row: any): string | null {
   const descKeys = ["descriere", "description", "detalii", "details", "beneficiar"];
 
   for (const key of Object.keys(row)) {
-    const lowerKey = key.toLowerCase();
-    if (descKeys.some((k) => lowerKey.includes(k))) {
+    const normalizedKey = key.toLowerCase().trim();
+    if (descKeys.some((k) => normalizedKey.includes(k))) {
       console.log('[detectDescription] Found description column:', key, '→', row[key]);
       return row[key];
     }
@@ -302,16 +303,15 @@ function detectDescription(row: any): string | null {
 
 function detectAmount(row: any): string | null {
   // Adăugăm "sumă" cu diacritice pentru Revolut România
-  const amountKeys = ["sumă", "suma", "amount", "valoare", "value", "total"];
-
-  // DEBUG: Afișăm toate cheile pentru a vedea ce primim exact
-  console.log('[detectAmount] All keys in row:', Object.keys(row).map(k => `"${k}"`));
+  // NOTĂ: Excel exportă "SumÄ" (Ä = A-umlaut) în loc de "Sumă" (Ă = A-breve)
+  const amountKeys = ["sumă", "sumä", "suma", "amount", "valoare", "value", "total"];
 
   // Căutăm o coloană cu suma
   for (const key of Object.keys(row)) {
-    const lowerKey = key.toLowerCase().trim(); // Adăugăm trim() pentru spații
-    console.log('[detectAmount] Checking key:', `"${key}"`, '→ lowercase:', `"${lowerKey}"`);
-    if (amountKeys.some((k) => lowerKey.includes(k))) {
+    // Normalizăm: lowercase + trim spații invizibile
+    const normalizedKey = key.toLowerCase().trim();
+
+    if (amountKeys.some((k) => normalizedKey.includes(k))) {
       console.log('[detectAmount] Found amount column:', key, '→', row[key]);
       return row[key];
     }
