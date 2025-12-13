@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
         categoryId, // Categorie auto-detectată sau null
         date: new Date(t.date),
         description: t.description,
-        amount: String(parseFloat(t.amount)), // Convert to string for PostgreSQL decimal type
+        amount: parseFloat(t.amount), // PostgreSQL decimal with mode: 'number'
         currency: t.currency || user.nativeCurrency,
         // Removed: type, source, originalData, isCategorized, notes (not in PostgreSQL schema)
       };
