@@ -385,7 +385,12 @@ export default function TransactionsPage() {
                           />
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          {new Date(transaction.date).toLocaleDateString("ro-RO")}
+                          {(() => {
+                            // Parsăm data în format YYYY-MM-DD fără timezone conversion
+                            const dateStr = String(transaction.date);
+                            const [year, month, day] = dateStr.split('T')[0].split('-');
+                            return `${day}.${month}.${year}`;
+                          })()}
                         </td>
                         <td className="px-4 py-3 text-sm">
                           {getBankName(transaction.bankId)}
