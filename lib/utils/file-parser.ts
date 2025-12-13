@@ -260,7 +260,8 @@ export async function parsePDF(file: File): Promise<ParseResult> {
 function detectDate(row: any): string | null {
   // Căutăm o coloană care arată ca o dată
   // Adăugăm "completed" pentru Revolut (Completed Date)
-  const dateKeys = ["completed", "data", "date", "data operatiunii", "data tranzactiei"];
+  // Adăugăm "început" pentru Revolut România (Data de început)
+  const dateKeys = ["completed", "data", "date", "început", "inceput", "start", "data operatiunii", "data tranzactiei"];
 
   for (const key of Object.keys(row)) {
     const lowerKey = key.toLowerCase();
@@ -359,11 +360,38 @@ function isDate(str: string): boolean {
 }
 
 /**
+ * Convertește Excel serial number în dată
+ * Excel stochează datele ca număr de zile de la 1 ianuarie 1900
+ */
+function excelSerialToDate(serial: number): string {
+  // Excel epoch: 1 ianuarie 1900 (cu bug: consideră 1900 an bisect)
+  const excelEpoch = new Date(1900, 0, 1);
+  const days = Math.floor(serial) - 2; // -2 pentru bug-ul Excel 1900
+  const milliseconds = days * 24 * 60 * 60 * 1000;
+  const date = new Date(excelEpoch.getTime() + milliseconds);
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
  * Formatează data în format ISO (YYYY-MM-DD)
  */
 function formatDate(dateStr: string): string {
   // DEBUG: Log intrare
   console.log('[formatDate] Input:', JSON.stringify(dateStr), 'Type:', typeof dateStr);
+
+  // Verificăm dacă e Excel serial number (număr > 40000 = post-2009)
+  const asNumber = parseFloat(dateStr);
+  if (!isNaN(asNumber) && asNumber > 40000 && asNumber < 60000) {
+    console.log('[formatDate] Excel serial number detected:', asNumber);
+    const result = excelSerialToDate(asNumber);
+    console.log('[formatDate] Converted to date:', result);
+    return result;
+  }
 
   // Validare: dacă nu primim string valid, returnăm data curentă
   if (!dateStr || typeof dateStr !== 'string') {
