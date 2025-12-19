@@ -40,21 +40,31 @@ export interface ParseResult {
  * FUNCȚIA 1: Parse CSV
  *
  * Parsează un fișier CSV și extrage tranzacțiile.
+ * SUPORT MULTI-FORMAT: Funcționează automat cu diverse formate bancare:
+ * - Bănci românești (ING, BCR, BT, Revolut RO): date, descriere, suma, moneda
+ * - Bănci rusești/internaționale: Дата, Описание, Сумма, Валюта
+ * - Format cu dată timestamp: YYYY-MM-DD HH:MM:SS
+ * - Encoding: UTF-8 (suport complet pentru diacritice și Cyrillic)
  *
  * PARAMETRI:
  * @param file - Fișierul CSV (File object din input)
  * @returns Promise cu rezultatul parsării
  *
- * EXEMPLU CSV:
- * Data,Descriere,Suma,Moneda
+ * EXEMPLU CSV ROMÂNESC:
+ * date,description,amount,currency
  * 01.12.2025,MEGA IMAGE,-45.50,RON
  * 02.12.2025,Salariu,5000.00,RON
+ *
+ * EXEMPLU CSV RUSESC:
+ * Тип,Продукт,Дата начала,Дата выполнения,Описание,Сумма,Комиссия,Валюта
+ * Переводы,Сбережения,2025-12-02 08:57:52,2025-12-02 08:57:52,В кошелек,0.10,0.00,EUR
  */
 export async function parseCSV(file: File): Promise<ParseResult> {
   return new Promise((resolve) => {
     Papa.parse(file, {
       header: true, // Prima linie = header-e (nume coloane)
       skipEmptyLines: true, // Ignoră liniile goale
+      encoding: 'UTF-8', // Suport pentru caractere speciale (română, rusă, etc)
       complete: (results) => {
         try {
           // Verificăm dacă avem date
@@ -262,7 +272,12 @@ function detectDate(row: any): string | null {
   // Adăugăm "completed" pentru Revolut (Completed Date)
   // Adăugăm "început" pentru Revolut România (Data de început)
   // NOTĂ: Excel exportă "Ä" în loc de "Ă" pentru caracterele românești
-  const dateKeys = ["completed", "data", "date", "început", "inceput", "änceput", "start", "data operatiunii", "data tranzactiei"];
+  // RUSSIAN: "Дата начала", "Дата выполнения" (Start Date, Completion Date)
+  const dateKeys = [
+    "completed", "data", "date", "început", "inceput", "änceput", "start",
+    "data operatiunii", "data tranzactiei",
+    "дата", "дата начала", "дата выполнения", // Russian: date, start date, completion date
+  ];
 
   for (const key of Object.keys(row)) {
     const normalizedKey = key.toLowerCase().trim();
@@ -287,7 +302,11 @@ function detectDate(row: any): string | null {
 
 function detectDescription(row: any): string | null {
   // Adăugăm variante cu diacritice pentru Revolut România
-  const descKeys = ["descriere", "description", "detalii", "details", "beneficiar"];
+  // RUSSIAN: "Описание" (Description)
+  const descKeys = [
+    "descriere", "description", "detalii", "details", "beneficiar",
+    "описание", // Russian: description
+  ];
 
   for (const key of Object.keys(row)) {
     const normalizedKey = key.toLowerCase().trim();
@@ -304,7 +323,11 @@ function detectDescription(row: any): string | null {
 function detectAmount(row: any): string | null {
   // Adăugăm "sumă" cu diacritice pentru Revolut România
   // NOTĂ: Excel exportă "SumÄ" (Ä = A-umlaut) în loc de "Sumă" (Ă = A-breve)
-  const amountKeys = ["sumă", "sumä", "suma", "amount", "valoare", "value", "total"];
+  // RUSSIAN: "Сумма" (Amount)
+  const amountKeys = [
+    "sumă", "sumä", "suma", "amount", "valoare", "value", "total",
+    "сумма", // Russian: amount
+  ];
 
   // Căutăm o coloană cu suma
   for (const key of Object.keys(row)) {
@@ -352,10 +375,14 @@ function detectAmount(row: any): string | null {
 }
 
 function detectCurrency(row: any): string | null {
-  const currencyKeys = ["moneda", "currency", "valuta"];
+  // RUSSIAN: "Валюта" (Currency)
+  const currencyKeys = [
+    "moneda", "currency", "valuta",
+    "валюта", // Russian: currency
+  ];
 
   for (const key of Object.keys(row)) {
-    const lowerKey = key.toLowerCase();
+    const lowerKey = key.toLowerCase().trim();
     if (currencyKeys.some((k) => lowerKey.includes(k))) {
       return row[key];
     }
@@ -368,8 +395,12 @@ function detectCurrency(row: any): string | null {
  * Verifică dacă un string arată ca o dată
  */
 function isDate(str: string): boolean {
-  // Formate acceptate: DD.MM.YYYY, DD/MM/YYYY, YYYY-MM-DD, YYYY-MM-DD HH:MM (cu timestamp)
-  const dateRegex = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$|^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2})?$/;
+  // Formate acceptate:
+  // - DD.MM.YYYY, DD/MM/YYYY (Romanian)
+  // - YYYY-MM-DD HH:MM:SS (Russian)
+  // - YYYY-MM-DD HH:MM (ISO with timestamp)
+  // - YYYY-MM-DD (ISO)
+  const dateRegex = /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$|^\d{4}-\d{2}-\d{2}(\s\d{2}:\d{2}(:\d{2})?)?$/;
   return dateRegex.test(str);
 }
 
@@ -424,8 +455,9 @@ function formatDate(dateStr: string | number): string {
   console.log('[formatDate] After trim:', JSON.stringify(cleanStr));
 
   // Dacă e deja ISO format (cu sau fără timestamp)
+  // Ex: "2025-12-02 08:57:52" (Russian) sau "2025-12-02" (ISO)
   if (/^\d{4}-\d{2}-\d{2}/.test(cleanStr)) {
-    // Extragem doar partea de dată (fără timestamp)
+    // Extragem doar partea de dată (fără timestamp: " 08:57:52" sau "T08:57:52")
     const result = cleanStr.split(" ")[0].split("T")[0];
     console.log('[formatDate] ISO format detected. Result:', result);
     return result;
