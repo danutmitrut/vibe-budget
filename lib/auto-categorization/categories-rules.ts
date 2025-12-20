@@ -463,14 +463,27 @@ export const CATEGORY_RULES: CategoryRule[] = [
     description: "Transferuri către/de la prieteni, familie sau servicii de transfer",
     icon: "💸",
     keywords: [
+      // Română
       "transfer",
       "virament",
+      "către",
+      "de la",
+      // Engleză
+      "money transfer",
+      "payment from",
+      "payment to",
+      "to ", // "To Ina Chislaru" - spațiu după "to" pentru a evita false matches
+      "from ", // "From John Doe" - spațiu după "from"
+      "bizum", // Serviciu transfer Spania
+      // Rusă
+      "перевод", // Transfer
+      "получатель", // Recipient/Receiver
+      // Servicii
       "exchange",
       "schimb valutar",
       "revolut",
       "wise",
       "paypal",
-      "money transfer",
     ],
   },
 
