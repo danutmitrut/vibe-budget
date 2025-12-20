@@ -60,6 +60,7 @@ export default function TransactionsPage() {
   const [newCategoryIcon, setNewCategoryIcon] = useState("📋");
   const [newCategoryColor, setNewCategoryColor] = useState("#6366f1");
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [dropdownResetKey, setDropdownResetKey] = useState(0);
 
   useEffect(() => {
     fetchData();
@@ -185,6 +186,7 @@ export default function TransactionsPage() {
       setNewCategoryType("expense");
       setNewCategoryIcon("📋");
       setNewCategoryColor("#6366f1");
+      setDropdownResetKey((prev) => prev + 1); // Forțează re-render dropdown
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -491,6 +493,8 @@ export default function TransactionsPage() {
                             </span>
                           ) : (
                             <select
+                              key={`${transaction.id}-${dropdownResetKey}`}
+                              value=""
                               onChange={(e) =>
                                 handleCategorySelect(transaction.id, e.target.value)
                               }
@@ -636,6 +640,7 @@ export default function TransactionsPage() {
                     setShowCreateCategoryModal(false);
                     setPendingTransactionId(null);
                     setNewCategoryName("");
+                    setDropdownResetKey((prev) => prev + 1); // Resetează dropdown
                   }}
                   className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
                   disabled={isCreatingCategory}
