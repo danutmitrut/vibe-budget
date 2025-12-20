@@ -438,14 +438,22 @@ export const CATEGORY_RULES: CategoryRule[] = [
     description: "Transferuri între propriile conturi (nu afectează bugetul total)",
     icon: "🔄",
     keywords: [
+      // Română
       "transfer intern",
       "cont propriu",
       "între conturi",
+      // Engleză
       "from savings",
       "to savings",
       "internal transfer",
-      "сбережения", // Revolut RU: "Savings"
-      "текущий", // Revolut RU: "Current"
+      // Rusă (Revolut RU)
+      "сбережения", // Savings
+      "текущий", // Current
+      "накопления", // Accumulation/Savings
+      "в кошелек", // To wallet/pocket (către savings)
+      "из eur", // From EUR (din cont EUR)
+      "мгновенным доступом", // Instant access
+      "from сбережения", // From Savings (mixed RU/EN)
     ],
   },
 
