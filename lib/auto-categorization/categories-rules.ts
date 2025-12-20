@@ -463,27 +463,18 @@ export const CATEGORY_RULES: CategoryRule[] = [
     description: "Transferuri către/de la prieteni, familie sau servicii de transfer",
     icon: "💸",
     keywords: [
-      // Română
-      "transfer",
-      "virament",
-      "către",
-      "de la",
-      // Engleză
+      // Engleză - specifice pentru transferuri către persoane
       "money transfer",
-      "payment from",
-      "payment to",
-      "to ", // "To Ina Chislaru" - spațiu după "to" pentru a evita false matches
-      "from ", // "From John Doe" - spațiu după "from"
+      "payment from:",
+      "payment to:",
+      "to ina", // To Ina Chislaru - specific
+      "to vadim", // To Vadim K. - specific
       "bizum", // Serviciu transfer Spania
-      // Rusă
-      "перевод", // Transfer
-      "получатель", // Recipient/Receiver
-      // Servicii
-      "exchange",
-      "schimb valutar",
-      "revolut",
-      "wise",
-      "paypal",
+      // Rusă - transferuri către persoane
+      "перевод, получатель:", // Transfer, recipient: (format Revolut RU)
+      "получатель:", // Recipient: (cu două puncte pentru a fi specific)
+      // Indicatori de transfer către persoană (nume propriu după "to"/"from")
+      // Notă: Nu folosim "to " sau "from " generic pentru a evita conflicte cu Transfer Intern
     ],
   },
 
