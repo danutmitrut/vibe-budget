@@ -20,8 +20,6 @@ interface Transaction {
   description: string;
   amount: number;
   currency: string;
-  type: string;
-  isCategorized: boolean;
 }
 
 interface Bank {
@@ -115,7 +113,7 @@ export default function TransactionsPage() {
       setTransactions(
         transactions.map((t) =>
           t.id === transactionId
-            ? { ...t, categoryId, isCategorized: true }
+            ? { ...t, categoryId }
             : t
         )
       );
@@ -219,7 +217,7 @@ export default function TransactionsPage() {
   };
 
   const filteredTransactions = showOnlyUncategorized
-    ? transactions.filter((t) => !t.isCategorized)
+    ? transactions.filter((t) => t.categoryId === null)
     : transactions;
 
   if (loading) {
