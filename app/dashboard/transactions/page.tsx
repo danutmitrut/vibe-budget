@@ -11,6 +11,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { toast } from "sonner";
 
 interface Transaction {
   id: string;
@@ -123,7 +124,7 @@ export default function TransactionsPage() {
     }
   };
 
-  const handleCategorize = async (transactionId: string, categoryId: string) => {
+  const handleCategorize = async (transactionId: string, categoryId: string, skipKeywordPrompt: boolean = false) => {
     try {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/transactions/${transactionId}`, {
@@ -145,8 +146,109 @@ export default function TransactionsPage() {
             : t
         )
       );
+
+      // Afișăm toast pentru salvare keyword DOAR dacă categorizare manuală (nu skip)
+      if (!skipKeywordPrompt) {
+        const transaction = transactions.find((t) => t.id === transactionId);
+        const category = categories.find((c) => c.id === categoryId);
+
+        if (transaction && category) {
+          // Sugerăm keyword din descriere
+          const suggestedKeyword = suggestKeywordFromDescription(transaction.description);
+
+          if (suggestedKeyword) {
+            toast(
+              <div className="flex flex-col gap-2">
+                <p className="font-medium">Salvezi "{suggestedKeyword}" pentru categoria {category.icon} {category.name}?</p>
+                <p className="text-sm text-gray-600">Tranzacțiile viitoare cu acest keyword vor fi categorizate automat.</p>
+                <div className="flex gap-2 mt-2">
+                  <button
+                    onClick={() => {
+                      handleSaveKeyword(suggestedKeyword, categoryId);
+                      toast.dismiss();
+                    }}
+                    className="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+                  >
+                    Da, aplică la toate
+                  </button>
+                  <button
+                    onClick={() => toast.dismiss()}
+                    className="px-3 py-1 bg-gray-200 text-gray-700 text-sm rounded hover:bg-gray-300"
+                  >
+                    Nu, doar aceasta
+                  </button>
+                </div>
+              </div>,
+              {
+                duration: 10000, // 10 secunde pentru a avea timp să citească
+              }
+            );
+          }
+        }
+      }
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  /**
+   * Sugerează keyword din descrierea tranzacției
+   * Exemple:
+   * - "COFIDIS SPAIN" → "cofidis"
+   * - "MEGA IMAGE BUCURESTI" → "mega image"
+   */
+  const suggestKeywordFromDescription = (description: string): string => {
+    if (!description) return "";
+
+    let keyword = description
+      .toLowerCase()
+      .trim()
+      // Remove URLs
+      .replace(/https?:\/\/[^\s]+/g, "")
+      .replace(/\.com|\.ro|\.md/g, "")
+      // Remove locations
+      .replace(/\b(bucuresti|cluj|iasi|timisoara|brasov|constanta|romania|spain|madrid|barcelona|moscow|russia)\b/g, "")
+      // Remove numbers and special chars
+      .replace(/[0-9]/g, "")
+      .replace(/[^a-z\s]/g, " ")
+      // Remove extra spaces
+      .replace(/\s+/g, " ")
+      .trim();
+
+    // Get first 1-2 words (merchant name usually)
+    const words = keyword.split(" ").filter(w => w.length > 2);
+    keyword = words.slice(0, 2).join(" ");
+
+    return keyword;
+  };
+
+  /**
+   * Salvează keyword personalizat pentru utilizator
+   */
+  const handleSaveKeyword = async (keyword: string, categoryId: string) => {
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/user-keywords", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ keyword, categoryId }),
+      });
+
+      if (!response.ok) throw new Error("Eroare la salvarea keyword-ului");
+
+      const data = await response.json();
+
+      toast.success(
+        data.updated
+          ? `Keyword "${keyword}" actualizat!`
+          : `Keyword "${keyword}" salvat! Tranzacțiile viitoare vor fi categorizate automat.`,
+        { duration: 3000 }
+      );
+    } catch (err: any) {
+      toast.error(err.message || "Eroare la salvarea keyword-ului");
     }
   };
 
@@ -181,9 +283,9 @@ export default function TransactionsPage() {
       // Adăugăm categoria nouă la listă
       setCategories([...categories, newCategory]);
 
-      // Dacă avem o tranzacție pendentă, o categorizăm automat
+      // Dacă avem o tranzacție pendentă, o categorizăm automat (skip keyword prompt)
       if (pendingTransactionId) {
-        await handleCategorize(pendingTransactionId, newCategory.id);
+        await handleCategorize(pendingTransactionId, newCategory.id, true);
       }
 
       // Resetăm modal-ul

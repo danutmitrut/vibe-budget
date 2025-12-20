@@ -298,6 +298,14 @@ export default function DashboardPage() {
             </p>
           </Link>
 
+          <Link href="/dashboard/keywords" className="bg-gradient-to-br from-blue-500 to-cyan-600 text-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
+            <div className="text-4xl mb-3">🔑</div>
+            <h3 className="text-lg font-semibold mb-2">Keyword-uri</h3>
+            <p className="text-white/90 text-sm">
+              Gestionează auto-categorizarea
+            </p>
+          </Link>
+
           <Link href="/dashboard/currencies" className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
             <div className="text-4xl mb-3">💱</div>
             <h3 className="text-lg font-semibold mb-2">Valute</h3>
