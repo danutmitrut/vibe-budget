@@ -18,6 +18,7 @@ import { db, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { eq, and, isNull } from "drizzle-orm";
 import { autoCategorizeByCategoryName } from "@/lib/auto-categorization/categories-rules";
+import { matchUserKeyword } from "@/lib/auto-categorization/user-keywords-matcher";
 
 /**
  * POST /api/transactions/recategorize
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
 
     // PASUL 3: Re-categorizăm fiecare tranzacție
+    // IMPORTANT: Verificăm mai întâi keyword-uri personalizate, apoi reguli globale
     let recategorizedCount = 0;
     let unchangedCount = 0;
 
@@ -84,22 +86,31 @@ export async function POST(request: NextRequest) {
         continue;
       }
 
-      // Rulăm auto-categorizarea
-      const suggestedCategoryName = autoCategorizeByCategoryName(description);
+      let categoryIdToAssign: string | null = null;
 
-      if (!suggestedCategoryName) {
-        // Nu am găsit o categorie potrivită
-        unchangedCount++;
-        continue;
+      // PRIORITATE 1: Verificăm keyword-uri personalizate ale utilizatorului
+      categoryIdToAssign = await matchUserKeyword(user.id, description);
+
+      // PRIORITATE 2: Dacă nu am găsit keyword personalizat, folosim regulile globale
+      if (!categoryIdToAssign) {
+        const suggestedCategoryName = autoCategorizeByCategoryName(description);
+
+        if (suggestedCategoryName) {
+          // Găsim categoria în baza de date pentru acest user
+          const categoryMatch = userCategories.find(
+            (c) => c.name === suggestedCategoryName
+          );
+
+          if (categoryMatch) {
+            categoryIdToAssign = categoryMatch.id;
+          } else {
+            console.log(`⚠️  Categoria '${suggestedCategoryName}' nu există pentru ${user.email}`);
+          }
+        }
       }
 
-      // Găsim categoria în baza de date pentru acest user
-      const categoryMatch = userCategories.find(
-        (c) => c.name === suggestedCategoryName
-      );
-
-      if (!categoryMatch) {
-        console.log(`⚠️  Categoria '${suggestedCategoryName}' nu există pentru ${user.email}`);
+      // Dacă nu am găsit nicio categorie, sărim peste
+      if (!categoryIdToAssign) {
         unchangedCount++;
         continue;
       }
@@ -107,10 +118,12 @@ export async function POST(request: NextRequest) {
       // UPDATE: Actualizăm categoria
       await db
         .update(schema.transactions)
-        .set({ categoryId: categoryMatch.id })
+        .set({ categoryId: categoryIdToAssign })
         .where(eq(schema.transactions.id, transaction.id));
 
-      console.log(`✅ "${description.substring(0, 40)}" → ${categoryMatch.icon} ${categoryMatch.name}`);
+      // Găsim categoria pentru log
+      const assignedCategory = userCategories.find((c) => c.id === categoryIdToAssign);
+      console.log(`✅ "${description.substring(0, 40)}" → ${assignedCategory?.icon} ${assignedCategory?.name}`);
       recategorizedCount++;
     }
 

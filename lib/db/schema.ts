@@ -191,6 +191,38 @@ export const transactions = pgTable("transactions", {
 });
 
 /**
+ * TABELA 6: USER_KEYWORDS (Keyword-uri personalizate pentru auto-categorizare)
+ *
+ * CE STOCĂM:
+ * - id: Identificator unic
+ * - userId: ID-ul utilizatorului (cine a salvat keyword-ul)
+ * - keyword: Cuvântul/fraza cheie (ex: "cofidis", "netflix")
+ * - categoryId: ID-ul categoriei asociate
+ * - createdAt: Când a fost salvat keyword-ul
+ *
+ * SCOP:
+ * Când utilizatorul categorizează manual o tranzacție, îl întrebăm dacă vrea să
+ * salveze merchant-ul/descrierea ca keyword pentru categoria respectivă.
+ * La următoarele upload-uri CSV, aplicația va folosi aceste keyword-uri personalizate
+ * pentru auto-categorizare (cu prioritate față de regulile globale).
+ */
+export const userKeywords = pgTable("user_keywords", {
+  id: text("id")
+    .primaryKey()
+    .$defaultFn(() => createId()),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }), // Șterge keyword-urile când userul se șterge
+  keyword: text("keyword").notNull(), // Ex: "cofidis", "netflix", "mega image"
+  categoryId: text("category_id")
+    .notNull()
+    .references(() => categories.id, { onDelete: "cascade" }), // Șterge keyword-ul când categoria se șterge
+  createdAt: timestamp("created_at")
+    .notNull()
+    .defaultNow(),
+});
+
+/**
  * TIPURI TYPESCRIPT
  *
  * Acestea ne ajută să folosim datele în cod cu autocompletare.
@@ -210,3 +242,6 @@ export type NewCategory = typeof categories.$inferInsert;
 
 export type Transaction = typeof transactions.$inferSelect;
 export type NewTransaction = typeof transactions.$inferInsert;
+
+export type UserKeyword = typeof userKeywords.$inferSelect;
+export type NewUserKeyword = typeof userKeywords.$inferInsert;

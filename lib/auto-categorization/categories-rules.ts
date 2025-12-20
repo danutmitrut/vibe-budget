@@ -67,6 +67,7 @@ export const CATEGORY_RULES: CategoryRule[] = [
       // Parcări
       "parcare",
       "parking",
+      "easypark", // Aplicație parcare
       // Service auto
       "service auto",
       "vulcanizare",

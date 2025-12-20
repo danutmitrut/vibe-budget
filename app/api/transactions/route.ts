@@ -12,6 +12,7 @@ import { db, schema } from "@/lib/db";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { autoCategorizeByCategoryName } from "@/lib/auto-categorization/categories-rules";
+import { matchUserKeyword } from "@/lib/auto-categorization/user-keywords-matcher";
 
 /**
  * GET /api/transactions
@@ -139,45 +140,54 @@ export async function POST(request: NextRequest) {
     console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
 
     // PASUL 2: Pregătim tranzacțiile pentru inserare cu AUTO-CATEGORIZARE
-    const transactionsToInsert = transactions.map((t, index) => {
-      // DEBUG: Log first 3 transactions
-      if (index < 3) {
-        console.log(`[API] Transaction ${index}:`, {
-          date_received: t.date,
-          date_type: typeof t.date,
-          date_asDate: new Date(t.date).toISOString(),
-          description: t.description.substring(0, 30),
-          amount: t.amount
-        });
-      }
-
-      // Încercăm să categorizăm automat pe bază de descriere
-      const suggestedCategoryName = autoCategorizeByCategoryName(t.description);
-      let categoryId: string | null = null;
-
-      if (suggestedCategoryName) {
-        // Găsim categoria în lista utilizatorului
-        const matchedCategory = userCategories.find(
-          (c) => c.name === suggestedCategoryName
-        );
-
-        if (matchedCategory) {
-          categoryId = matchedCategory.id;
-          console.log(`✅ "${t.description}" → ${suggestedCategoryName}`);
+    // IMPORTANT: Verificăm mai întâi keyword-uri personalizate, apoi reguli globale
+    const transactionsToInsert = await Promise.all(
+      transactions.map(async (t, index) => {
+        // DEBUG: Log first 3 transactions
+        if (index < 3) {
+          console.log(`[API] Transaction ${index}:`, {
+            date_received: t.date,
+            date_type: typeof t.date,
+            date_asDate: new Date(t.date).toISOString(),
+            description: t.description.substring(0, 30),
+            amount: t.amount,
+          });
         }
-      }
 
-      return {
-        userId: user.id,
-        bankId: t.bankId || null,
-        categoryId, // Categorie auto-detectată sau null
-        date: t.date, // Keep as string (YYYY-MM-DD format)
-        description: t.description,
-        amount: parseFloat(t.amount), // PostgreSQL decimal with mode: 'number'
-        currency: t.currency || user.nativeCurrency,
-        // Removed: type, source, originalData, isCategorized, notes (not in PostgreSQL schema)
-      };
-    });
+        let categoryId: string | null = null;
+
+        // PRIORITATE 1: Verificăm keyword-uri personalizate ale utilizatorului
+        categoryId = await matchUserKeyword(user.id, t.description);
+
+        // PRIORITATE 2: Dacă nu am găsit keyword personalizat, folosim regulile globale
+        if (!categoryId) {
+          const suggestedCategoryName = autoCategorizeByCategoryName(t.description);
+
+          if (suggestedCategoryName) {
+            // Găsim categoria în lista utilizatorului
+            const matchedCategory = userCategories.find(
+              (c) => c.name === suggestedCategoryName
+            );
+
+            if (matchedCategory) {
+              categoryId = matchedCategory.id;
+              console.log(`✅ Global rule: "${t.description}" → ${suggestedCategoryName}`);
+            }
+          }
+        }
+
+        return {
+          userId: user.id,
+          bankId: t.bankId || null,
+          categoryId, // Categorie auto-detectată sau null
+          date: t.date, // Keep as string (YYYY-MM-DD format)
+          description: t.description,
+          amount: parseFloat(t.amount), // PostgreSQL decimal with mode: 'number'
+          currency: t.currency || user.nativeCurrency,
+          // Removed: type, source, originalData, isCategorized, notes (not in PostgreSQL schema)
+        };
+      })
+    );
 
     // Inserăm în baza de date
     const inserted = await db
