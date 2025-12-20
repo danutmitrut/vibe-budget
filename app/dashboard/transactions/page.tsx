@@ -52,6 +52,15 @@ export default function TransactionsPage() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Create category modal
+  const [showCreateCategoryModal, setShowCreateCategoryModal] = useState(false);
+  const [pendingTransactionId, setPendingTransactionId] = useState<string | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [newCategoryType, setNewCategoryType] = useState<"income" | "expense">("expense");
+  const [newCategoryIcon, setNewCategoryIcon] = useState("📋");
+  const [newCategoryColor, setNewCategoryColor] = useState("#6366f1");
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+
   useEffect(() => {
     fetchData();
   }, [selectedBankId]);
@@ -95,6 +104,17 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleCategorySelect = (transactionId: string, value: string) => {
+    if (value === "CREATE_NEW") {
+      // Deschide modal pentru creare categorie nouă
+      setPendingTransactionId(transactionId);
+      setShowCreateCategoryModal(true);
+    } else {
+      // Categorizare normală
+      handleCategorize(transactionId, value);
+    }
+  };
+
   const handleCategorize = async (transactionId: string, categoryId: string) => {
     try {
       const token = localStorage.getItem("token");
@@ -119,6 +139,56 @@ export default function TransactionsPage() {
       );
     } catch (err: any) {
       alert(err.message);
+    }
+  };
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) {
+      alert("Introdu numele categoriei");
+      return;
+    }
+
+    setIsCreatingCategory(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/categories", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          name: newCategoryName,
+          type: newCategoryType,
+          icon: newCategoryIcon,
+          color: newCategoryColor,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Eroare la crearea categoriei");
+
+      const data = await response.json();
+      const newCategory = data.category;
+
+      // Adăugăm categoria nouă la listă
+      setCategories([...categories, newCategory]);
+
+      // Dacă avem o tranzacție pendentă, o categorizăm automat
+      if (pendingTransactionId) {
+        await handleCategorize(pendingTransactionId, newCategory.id);
+      }
+
+      // Resetăm modal-ul
+      setShowCreateCategoryModal(false);
+      setPendingTransactionId(null);
+      setNewCategoryName("");
+      setNewCategoryType("expense");
+      setNewCategoryIcon("📋");
+      setNewCategoryColor("#6366f1");
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setIsCreatingCategory(false);
     }
   };
 
@@ -422,7 +492,7 @@ export default function TransactionsPage() {
                           ) : (
                             <select
                               onChange={(e) =>
-                                handleCategorize(transaction.id, e.target.value)
+                                handleCategorySelect(transaction.id, e.target.value)
                               }
                               className="px-3 py-1 border border-gray-300 rounded-lg text-xs"
                             >
@@ -432,6 +502,10 @@ export default function TransactionsPage() {
                                   {cat.icon} {cat.name}
                                 </option>
                               ))}
+                              <option value="" disabled>──────────</option>
+                              <option value="CREATE_NEW" className="font-semibold text-indigo-600">
+                                ➕ Creare categorie nouă
+                              </option>
                             </select>
                           )}
                         </td>
@@ -455,6 +529,127 @@ export default function TransactionsPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Modal Creare Categorie */}
+        {showCreateCategoryModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-md">
+              <h2 className="text-xl font-bold mb-4 text-gray-900">
+                Creare Categorie Nouă
+              </h2>
+
+              <div className="space-y-4">
+                {/* Nume */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Nume categorie
+                  </label>
+                  <input
+                    type="text"
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    placeholder="ex: Restaurant, Benzină, Salariu"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Tip */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Tip
+                  </label>
+                  <select
+                    value={newCategoryType}
+                    onChange={(e) => setNewCategoryType(e.target.value as "income" | "expense")}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-gray-900"
+                  >
+                    <option value="expense">Cheltuială</option>
+                    <option value="income">Venit</option>
+                  </select>
+                </div>
+
+                {/* Icon */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Icon (emoji)
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={newCategoryIcon}
+                      onChange={(e) => setNewCategoryIcon(e.target.value)}
+                      placeholder="📋"
+                      className="w-20 px-4 py-2 border border-gray-300 rounded-lg text-center text-2xl"
+                      maxLength={2}
+                    />
+                    <div className="flex-1 flex gap-1 flex-wrap">
+                      {["🍔", "🚗", "🏠", "💊", "🎬", "📚", "💰", "💸", "🧾"].map((emoji) => (
+                        <button
+                          key={emoji}
+                          onClick={() => setNewCategoryIcon(emoji)}
+                          className="w-10 h-10 border border-gray-300 rounded-lg hover:bg-gray-100 text-xl"
+                        >
+                          {emoji}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Culoare */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Culoare
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="color"
+                      value={newCategoryColor}
+                      onChange={(e) => setNewCategoryColor(e.target.value)}
+                      className="w-20 h-10 border border-gray-300 rounded-lg cursor-pointer"
+                    />
+                    <div className="flex-1 flex gap-2 flex-wrap">
+                      {["#ec4899", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#22c55e", "#64748b"].map((color) => (
+                        <button
+                          key={color}
+                          onClick={() => setNewCategoryColor(color)}
+                          className="w-10 h-10 rounded-lg border-2"
+                          style={{
+                            backgroundColor: color,
+                            borderColor: newCategoryColor === color ? "#000" : color,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Butoane */}
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => {
+                    setShowCreateCategoryModal(false);
+                    setPendingTransactionId(null);
+                    setNewCategoryName("");
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  disabled={isCreatingCategory}
+                >
+                  Anulează
+                </button>
+                <button
+                  onClick={handleCreateCategory}
+                  disabled={isCreatingCategory || !newCategoryName.trim()}
+                  className="flex-1 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isCreatingCategory ? "Se creează..." : "Creare categorie"}
+                </button>
+              </div>
             </div>
           </div>
         )}
