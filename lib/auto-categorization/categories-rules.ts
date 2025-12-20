@@ -151,53 +151,6 @@ export const CATEGORY_RULES: CategoryRule[] = [
     ],
   },
 
-  // 2. TRANSPORT (Transport în comun sau cheltuieli cu mijlocul personal de transport)
-  {
-    categoryName: "Transport",
-    description: "Transport în comun sau cheltuieli cu mijlocul personal de transport (benzină, service auto, taxi, Uber)",
-    icon: "🚗",
-    keywords: [
-      // Benzinării România
-      "petrom",
-      "omv",
-      "rompetrol",
-      "mol",
-      "lukoil",
-      "socar",
-      "benzinarie",
-      // Transport public
-      "metrorex",
-      "ratb",
-      "stb",
-      "bilet",
-      "abonament",
-      "transport",
-      "transport for london",
-      // Taxi & Ride-sharing
-      "uber",
-      "bolt",
-      "taxi",
-      "clever",
-      "freenow",
-      // Parcări
-      "parcare",
-      "parking",
-      // Service auto
-      "service auto",
-      "vulcanizare",
-      "spalatorie auto",
-      "itp",
-      "rca",
-      "rovinieta",
-      // Internațional
-      "shell",
-      "bp",
-      "esso",
-      "fuel",
-      "gas station",
-    ],
-  },
-
   // 3. LOCUINȚĂ (Cheltuieli de utilități, chirii, rate imobiliare, renovări, mobilări)
   {
     categoryName: "Locuință",
