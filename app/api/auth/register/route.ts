@@ -41,7 +41,8 @@ function getColorForCategory(categoryName: string): string {
     Subscripții: "#06b6d4", // Cyan
     Educație: "#6366f1", // Indigo
     Venituri: "#22c55e", // Verde deschis
-    Transferuri: "#64748b", // Slate
+    "Transfer Intern": "#10b981", // Verde (emerald) - neutral, între conturi proprii
+    Transferuri: "#64748b", // Slate - transferuri externe
     "Taxe și Impozite": "#dc2626", // Roșu închis
     Cash: "#14b8a6", // Teal
   };

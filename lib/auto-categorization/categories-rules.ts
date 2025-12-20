@@ -6,7 +6,7 @@
  * Fiecare categorie are o listă de pattern-uri (cuvinte cheie) care identifică
  * comercianți sau tipuri de tranzacții.
  *
- * CATEGORII REDEFINITE (2025-12-10):
+ * CATEGORII REDEFINITE (2025-12-20):
  * - Transport: transport în comun sau cheltuieli cu mijlocul personal de transport
  * - Sănătate: medicamente, investigații, consultații, intervenții
  * - Cumpărături: tot ce ține de market, supermarket și cumpărături online
@@ -15,7 +15,8 @@
  * - Subscripții: Netflix, Spotify, abonamente software
  * - Educație: școală, cărți, cursuri online
  * - Venituri: salarii, freelance, dividende, bonusuri
- * - Transferuri: transferuri între conturi, către/de la prieteni
+ * - Transfer Intern: transferuri între propriile conturi (nu afectează bugetul)
+ * - Transferuri: transferuri către/de la prieteni sau servicii externe
  * - Taxe și Impozite: taxe, impozite, amenzi
  * - Cash: retrageri de numerar
  */
@@ -431,10 +432,27 @@ export const CATEGORY_RULES: CategoryRule[] = [
     ],
   },
 
-  // 9. TRANSFERURI (Transferuri între conturi, către/de la prieteni)
+  // 9. TRANSFER INTERN (Transferuri între propriile conturi)
+  {
+    categoryName: "Transfer Intern",
+    description: "Transferuri între propriile conturi (nu afectează bugetul total)",
+    icon: "🔄",
+    keywords: [
+      "transfer intern",
+      "cont propriu",
+      "între conturi",
+      "from savings",
+      "to savings",
+      "internal transfer",
+      "сбережения", // Revolut RU: "Savings"
+      "текущий", // Revolut RU: "Current"
+    ],
+  },
+
+  // 10. TRANSFERURI (Transferuri externe - către/de la alte persoane)
   {
     categoryName: "Transferuri",
-    description: "Transferuri între conturi, către/de la prieteni sau familie",
+    description: "Transferuri către/de la prieteni, familie sau servicii de transfer",
     icon: "💸",
     keywords: [
       "transfer",
@@ -448,7 +466,7 @@ export const CATEGORY_RULES: CategoryRule[] = [
     ],
   },
 
-  // 10. TAXE ȘI IMPOZITE (Taxe, impozite, amenzi)
+  // 11. TAXE ȘI IMPOZITE (Taxe, impozite, amenzi)
   {
     categoryName: "Taxe și Impozite",
     description: "Taxe, impozite, amenzi, penalități",
@@ -467,7 +485,7 @@ export const CATEGORY_RULES: CategoryRule[] = [
     ],
   },
 
-  // 11. CASH (Retrageri numerar)
+  // 12. CASH (Retrageri numerar)
   {
     categoryName: "Cash",
     description: "Retrageri de numerar de la ATM",
