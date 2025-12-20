@@ -62,6 +62,9 @@ export default function TransactionsPage() {
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [dropdownResetKey, setDropdownResetKey] = useState(0);
 
+  // Editing category mode
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+
   useEffect(() => {
     fetchData();
   }, [selectedBankId]);
@@ -481,24 +484,30 @@ export default function TransactionsPage() {
                         </td>
                         <td className="px-4 py-3 text-sm">{transaction.description}</td>
                         <td className="px-4 py-3 text-sm">
-                          {category ? (
+                          {category && editingCategoryId !== transaction.id ? (
                             <span
-                              className="px-3 py-1 rounded-full text-xs font-semibold"
+                              onClick={() => setEditingCategoryId(transaction.id)}
+                              className="px-3 py-1 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition inline-flex items-center gap-1"
                               style={{
                                 backgroundColor: category.color || "#6366f1",
                                 color: "white",
                               }}
+                              title="Click pentru a schimba categoria"
                             >
                               {category.icon} {category.name}
+                              <span className="text-[10px] opacity-70">✏️</span>
                             </span>
                           ) : (
                             <select
                               key={`${transaction.id}-${dropdownResetKey}`}
-                              value=""
-                              onChange={(e) =>
-                                handleCategorySelect(transaction.id, e.target.value)
-                              }
+                              value={editingCategoryId === transaction.id && category ? category.id : ""}
+                              onChange={(e) => {
+                                handleCategorySelect(transaction.id, e.target.value);
+                                setEditingCategoryId(null);
+                              }}
+                              onBlur={() => setEditingCategoryId(null)}
                               className="px-3 py-1 border border-gray-300 rounded-lg text-xs"
+                              autoFocus={editingCategoryId === transaction.id}
                             >
                               <option value="">Alege categoria...</option>
                               {categories.map((cat) => (
