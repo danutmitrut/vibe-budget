@@ -65,6 +65,10 @@ export default function TransactionsPage() {
   // Editing category mode
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
 
+  // Recategorize state
+  const [isRecategorizing, setIsRecategorizing] = useState(false);
+  const [recategorizeMessage, setRecategorizeMessage] = useState("");
+
   useEffect(() => {
     fetchData();
   }, [selectedBankId]);
@@ -215,6 +219,42 @@ export default function TransactionsPage() {
     }
   };
 
+  const handleRecategorize = async () => {
+    if (!confirm("Re-categorizare automată va procesa toate tranzacțiile necategorizate bazat pe regulile curente. Continui?")) {
+      return;
+    }
+
+    setIsRecategorizing(true);
+    setRecategorizeMessage("");
+
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch("/api/transactions/recategorize", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      });
+
+      if (!response.ok) throw new Error("Eroare la re-categorizare");
+
+      const data = await response.json();
+      setRecategorizeMessage(`✅ ${data.recategorized} tranzacții categorizate din ${data.total} necategorizate`);
+
+      // Reîncărcăm datele pentru a reflecta modificările
+      await fetchData();
+
+      // Ascundem mesajul după 5 secunde
+      setTimeout(() => setRecategorizeMessage(""), 5000);
+    } catch (err: any) {
+      setRecategorizeMessage(`❌ ${err.message}`);
+    } finally {
+      setIsRecategorizing(false);
+    }
+  };
+
   const toggleSelection = (transactionId: string) => {
     const newSelected = new Set(selectedIds);
     if (newSelected.has(transactionId)) {
@@ -341,7 +381,7 @@ export default function TransactionsPage() {
                 ))}
               </select>
             </div>
-            <div className="flex items-end">
+            <div className="flex items-end justify-between gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
@@ -353,8 +393,20 @@ export default function TransactionsPage() {
                   Doar necategorizate
                 </span>
               </label>
+              <button
+                onClick={handleRecategorize}
+                disabled={isRecategorizing}
+                className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
+              >
+                {isRecategorizing ? "Re-categorizare..." : "🔄 Re-categorizare automată"}
+              </button>
             </div>
           </div>
+          {recategorizeMessage && (
+            <div className="mt-4 p-3 bg-indigo-50 border border-indigo-200 rounded-lg text-sm text-indigo-800">
+              {recategorizeMessage}
+            </div>
+          )}
         </div>
 
         {/* Bulk Actions Toolbar */}
