@@ -43,7 +43,6 @@ export default function TransactionsPage() {
   const [banks, setBanks] = useState<Bank[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   // Filtre
   const [selectedBankId, setSelectedBankId] = useState("");
@@ -107,7 +106,8 @@ export default function TransactionsPage() {
       setBanks(banksData.banks);
       setCategories(categoriesData.categories);
     } catch (err: any) {
-      setError(err.message);
+      console.error("Error loading data:", err);
+      alert("Eroare la încărcarea datelor: " + err.message);
     } finally {
       setLoading(false);
     }
@@ -639,41 +639,60 @@ export default function TransactionsPage() {
                         <td className="px-4 py-3 text-sm">{transaction.description}</td>
                         <td className="px-4 py-3 text-sm">
                           {category && editingCategoryId !== transaction.id ? (
-                            <span
-                              onClick={() => setEditingCategoryId(transaction.id)}
-                              className="px-3 py-1 rounded-full text-xs font-semibold cursor-pointer hover:opacity-80 transition inline-flex items-center gap-1"
-                              style={{
-                                backgroundColor: category.color || "#6366f1",
-                                color: "white",
-                              }}
-                              title="Click pentru a schimba categoria"
-                            >
-                              {category.icon} {category.name}
-                              <span className="text-[10px] opacity-70">✏️</span>
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span
+                                onClick={() => setEditingCategoryId(transaction.id)}
+                                className="px-3 py-1 rounded-full text-xs font-semibold cursor-pointer hover:scale-105 hover:shadow-md transition-all inline-flex items-center gap-1"
+                                style={{
+                                  backgroundColor: category.color || "#6366f1",
+                                  color: "white",
+                                }}
+                                title="Click pentru a schimba categoria"
+                              >
+                                {category.icon} {category.name}
+                              </span>
+                              <button
+                                onClick={() => setEditingCategoryId(transaction.id)}
+                                className="text-indigo-600 hover:text-indigo-800 transition"
+                                title="Schimbă categoria"
+                              >
+                                ✏️
+                              </button>
+                            </div>
                           ) : (
-                            <select
-                              key={`${transaction.id}-${dropdownResetKey}`}
-                              value={editingCategoryId === transaction.id && category ? category.id : ""}
-                              onChange={(e) => {
-                                handleCategorySelect(transaction.id, e.target.value);
-                                setEditingCategoryId(null);
-                              }}
-                              onBlur={() => setEditingCategoryId(null)}
-                              className="px-3 py-1 border border-gray-300 rounded-lg text-xs"
-                              autoFocus={editingCategoryId === transaction.id}
-                            >
-                              <option value="">Alege categoria...</option>
-                              {categories.map((cat) => (
-                                <option key={cat.id} value={cat.id}>
-                                  {cat.icon} {cat.name}
+                            <div className="flex items-center gap-2">
+                              <select
+                                key={`${transaction.id}-${dropdownResetKey}`}
+                                value={editingCategoryId === transaction.id && category ? category.id : ""}
+                                onChange={(e) => {
+                                  handleCategorySelect(transaction.id, e.target.value);
+                                  setEditingCategoryId(null);
+                                }}
+                                onBlur={() => setEditingCategoryId(null)}
+                                className="px-3 py-1 border border-gray-300 rounded-lg text-xs flex-1"
+                                autoFocus={editingCategoryId === transaction.id}
+                              >
+                                <option value="">Alege categoria...</option>
+                                {categories.map((cat) => (
+                                  <option key={cat.id} value={cat.id}>
+                                    {cat.icon} {cat.name}
+                                  </option>
+                                ))}
+                                <option value="" disabled>──────────</option>
+                                <option value="CREATE_NEW" className="font-semibold text-indigo-600">
+                                  ➕ Creare categorie nouă
                                 </option>
-                              ))}
-                              <option value="" disabled>──────────</option>
-                              <option value="CREATE_NEW" className="font-semibold text-indigo-600">
-                                ➕ Creare categorie nouă
-                              </option>
-                            </select>
+                              </select>
+                              {category && (
+                                <button
+                                  onClick={() => setEditingCategoryId(null)}
+                                  className="text-gray-400 hover:text-gray-600 text-xs"
+                                  title="Anulează"
+                                >
+                                  ✖️
+                                </button>
+                              )}
+                            </div>
                           )}
                         </td>
                         <td
