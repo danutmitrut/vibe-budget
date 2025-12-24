@@ -1,8 +1,8 @@
 /**
- * UTILITATE: GET CURRENT USER
+ * UTILITATE: GET CURRENT USER (Supabase Auth)
  *
  * EXPLICAȚIE:
- * Funcție helper care extrage utilizatorul curent din token JWT.
+ * Funcție helper care extrage utilizatorul curent din sesiunea Supabase.
  *
  * UTILIZARE:
  * const user = await getCurrentUser(request);
@@ -13,17 +13,18 @@
  */
 
 import { NextRequest } from "next/server";
+import { createServerClient } from "@supabase/ssr";
 import { db, schema } from "@/lib/db";
-import { verifyToken, extractTokenFromHeader } from "./jwt";
 import { eq } from "drizzle-orm";
+import { cookies } from "next/headers";
 
 /**
- * Extrage și returnează utilizatorul curent din request.
+ * Extrage și returnează utilizatorul curent din sesiunea Supabase.
  *
  * PROCES:
- * 1. Extrage token-ul din header Authorization
- * 2. Verifică token-ul (validare + expirare)
- * 3. Caută utilizatorul în baza de date
+ * 1. Creează Supabase server client
+ * 2. Verifică sesiunea Supabase
+ * 3. Caută utilizatorul în tabela public.users
  * 4. Returnează utilizatorul sau null
  *
  * @param request - Request-ul Next.js
@@ -31,34 +32,44 @@ import { eq } from "drizzle-orm";
  */
 export async function getCurrentUser(request: NextRequest) {
   try {
-    // PASUL 1: Extragem token-ul din header
-    // Header: "Authorization: Bearer eyJhbGciOiJIUzI1NiIs..."
-    const authHeader = request.headers.get("authorization");
-    const token = extractTokenFromHeader(authHeader || "");
+    // PASUL 1: Creăm Supabase server client
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll();
+          },
+          setAll(cookiesToSet) {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            );
+          },
+        },
+      }
+    );
 
-    if (!token) {
-      return null; // Nu există token
+    // PASUL 2: Verificăm sesiunea Supabase
+    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+
+    if (authError || !authUser) {
+      return null; // Nu există sesiune validă
     }
 
-    // PASUL 2: Verificăm token-ul
-    const payload = verifyToken(token);
-
-    if (!payload) {
-      return null; // Token invalid sau expirat
-    }
-
-    // PASUL 3: Căutăm utilizatorul în baza de date
+    // PASUL 3: Căutăm utilizatorul în tabela public.users
     const users = await db
       .select()
       .from(schema.users)
-      .where(eq(schema.users.id, payload.userId))
+      .where(eq(schema.users.id, authUser.id))
       .limit(1);
 
     if (users.length === 0) {
-      return null; // Utilizatorul nu mai există
+      return null; // Utilizatorul nu există în public.users
     }
 
-    // PASUL 4: Returnăm utilizatorul (fără parolă!)
+    // PASUL 4: Returnăm utilizatorul
     const user = users[0];
     return {
       id: user.id,

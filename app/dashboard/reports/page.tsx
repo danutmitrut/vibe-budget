@@ -105,11 +105,7 @@ export default function ReportsPage() {
    */
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       setLoading(true);
 
@@ -122,7 +118,7 @@ export default function ReportsPage() {
       }
 
       const response = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) {
@@ -147,7 +143,7 @@ export default function ReportsPage() {
       if (!token) return;
 
       const response = await fetch("/api/ai/budget-recommendations", {
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (response.ok) {

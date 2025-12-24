@@ -36,14 +36,10 @@ export default function BanksPage() {
 
   const fetchBanks = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       const response = await fetch("/api/banks", {
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) throw new Error("Eroare la încărcarea băncilor");
@@ -97,7 +93,7 @@ export default function BanksPage() {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/banks/${id}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) throw new Error("Eroare la ștergerea băncii");

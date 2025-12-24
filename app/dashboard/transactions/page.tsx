@@ -75,22 +75,18 @@ export default function TransactionsPage() {
 
   const fetchData = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       // Fetch paralel pentru toate datele
       const [transactionsRes, banksRes, categoriesRes] = await Promise.all([
         fetch(`/api/transactions?limit=200${selectedBankId ? `&bankId=${selectedBankId}` : ""}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
         fetch("/api/banks", {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
         fetch("/api/categories", {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
       ]);
 
@@ -310,7 +306,7 @@ export default function TransactionsPage() {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/transactions/${transactionId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) throw new Error("Eroare la ștergere");

@@ -56,14 +56,10 @@ export default function PivotReportPage() {
 
   const fetchPivotData = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       const response = await fetch(`/api/reports/pivot?months=${monthsCount}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) throw new Error("Eroare la încărcarea datelor");

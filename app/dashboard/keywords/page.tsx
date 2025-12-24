@@ -37,14 +37,10 @@ export default function KeywordsPage() {
 
   const fetchKeywords = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       const response = await fetch("/api/user-keywords", {
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) {
@@ -74,7 +70,7 @@ export default function KeywordsPage() {
       const token = localStorage.getItem("token");
       const response = await fetch(`/api/user-keywords?id=${keywordId}`, {
         method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
+        
       });
 
       if (!response.ok) throw new Error("Eroare la ștergerea keyword-ului");
@@ -116,7 +112,7 @@ export default function KeywordsPage() {
         filteredKeywords.map((k) =>
           fetch(`/api/user-keywords?id=${k.id}`, {
             method: "DELETE",
-            headers: { Authorization: `Bearer ${token}` },
+            
           })
         )
       );

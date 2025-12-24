@@ -67,24 +67,20 @@ export default function AIInsightsPage() {
 
   const fetchAllInsights = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) {
-        router.push("/login");
-        return;
-      }
+      
 
       setLoading(true);
 
       // Fetch toate cele 3 insights în paralel
       const [healthRes, recsRes, anomRes] = await Promise.all([
         fetch("/api/ai/health-score", {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
         fetch("/api/ai/budget-recommendations", {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
         fetch("/api/ai/anomaly-detection", {
-          headers: { Authorization: `Bearer ${token}` },
+          
         }),
       ]);
 
