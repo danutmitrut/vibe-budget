@@ -1,5 +1,5 @@
 /**
- * PAGINA: DASHBOARD (Tabloul de bord principal)
+ * PAGINA: DASHBOARD (Tabloul de bord principal cu Supabase Auth)
  *
  * EXPLICAȚIE:
  * Aceasta este pagina principală a aplicației după autentificare.
@@ -7,8 +7,6 @@
  * - Sumar tranzacții
  * - Grafice
  * - Linkuri către managementul băncilor, categoriilor, etc.
- *
- * DEOCAMDATĂ: Placeholder simplu care confirmă că user e logat.
  */
 
 "use client";
@@ -16,6 +14,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface User {
   id: string;
@@ -41,39 +40,42 @@ export default function DashboardPage() {
   const [healthScore, setHealthScore] = useState<HealthScore | null>(null);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [showAnomalies, setShowAnomalies] = useState(false);
+  const supabase = createClient();
 
-  // PASUL 1: Verificăm dacă user e autentificat
+  // PASUL 1: Verificăm dacă user e autentificat cu Supabase
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem("token");
-
-      if (!token) {
-        // Nu există token, redirectăm la login
-        router.push("/login");
-        return;
-      }
-
       try {
-        // Verificăm token-ul cu backend-ul
-        const response = await fetch("/api/auth/me", {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        });
+        // Verificăm sesiunea Supabase
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
-        if (!response.ok) {
-          throw new Error("Token invalid");
+        if (authError || !authUser) {
+          router.push("/login");
+          return;
         }
 
-        const data = await response.json();
-        setUser(data.user);
+        // Obținem datele utilizatorului din tabela users
+        const { data: userData, error: userError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("id", authUser.id)
+          .single();
+
+        if (userError || !userData) {
+          throw new Error("Nu s-au putut încărca datele utilizatorului");
+        }
+
+        setUser({
+          id: userData.id,
+          email: userData.email,
+          name: userData.name,
+          nativeCurrency: userData.native_currency,
+        });
 
         // Fetch AI insights în background (non-blocking)
-        fetchAIInsights(token);
+        fetchAIInsights();
       } catch (error) {
-        // Token invalid, redirectăm la login
-        localStorage.removeItem("token");
-        localStorage.removeItem("user");
+        console.error("Auth error:", error);
         router.push("/login");
       } finally {
         setLoading(false);
@@ -84,15 +86,11 @@ export default function DashboardPage() {
   }, [router]);
 
   // Fetch AI Insights (non-blocking)
-  const fetchAIInsights = async (token: string) => {
+  const fetchAIInsights = async () => {
     try {
       const [healthRes, anomRes] = await Promise.all([
-        fetch("/api/ai/health-score", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        fetch("/api/ai/anomaly-detection", {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
+        fetch("/api/ai/health-score"),
+        fetch("/api/ai/anomaly-detection"),
       ]);
 
       if (healthRes.ok) {
@@ -113,10 +111,9 @@ export default function DashboardPage() {
     }
   };
 
-  // PASUL 2: Funcția de logout
-  const handleLogout = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("user");
+  // PASUL 2: Funcția de logout cu Supabase
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     router.push("/login");
   };
 
