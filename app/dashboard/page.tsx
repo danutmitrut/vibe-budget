@@ -311,6 +311,70 @@ export default function DashboardPage() {
             </p>
           </Link>
         </div>
+
+        {/* AI Insights Section */}
+        {(healthScore || anomalies.length > 0) && (
+          <div className="mt-8">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">🤖 AI Insights</h2>
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Health Score Card */}
+              {healthScore && (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-xl font-bold text-gray-900">Financial Health Score</h3>
+                    <span className={`px-4 py-2 rounded-full text-2xl font-bold border-2 ${getGradeColor(healthScore.grade)}`}>
+                      {healthScore.grade}
+                    </span>
+                  </div>
+                  <div className="mb-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-gray-600">Scor:</span>
+                      <span className="text-3xl font-bold text-indigo-600">{healthScore.score.toFixed(1)}/10</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-3">
+                      <div
+                        className="bg-indigo-600 h-3 rounded-full transition-all"
+                        style={{ width: `${(healthScore.score / 10) * 100}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                  <Link
+                    href="/dashboard/ai-insights"
+                    className="block text-center px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                  >
+                    Vezi detalii complete →
+                  </Link>
+                </div>
+              )}
+
+              {/* Anomalies Card */}
+              {anomalies.length > 0 && (
+                <div className="bg-white rounded-xl shadow-lg p-6">
+                  <h3 className="text-xl font-bold text-gray-900 mb-4">🚨 Alerte și Anomalii</h3>
+                  <div className="space-y-3 mb-4">
+                    {anomalies.slice(0, 3).map((anomaly, idx) => (
+                      <div
+                        key={idx}
+                        className={`p-3 rounded-lg ${getSeverityColor(anomaly.severity)}`}
+                      >
+                        <div className="font-semibold text-sm">{anomaly.description}</div>
+                        <div className="text-xs mt-1 opacity-75">
+                          {anomaly.severity.toUpperCase()}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <Link
+                    href="/dashboard/ai-insights"
+                    className="block text-center px-4 py-2 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition"
+                  >
+                    Vezi toate alertele →
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
