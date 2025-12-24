@@ -166,7 +166,7 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 1. **Configurare SMTP în Supabase Dashboard**
    - Provider: Resend
-   - API Key: `re_TxE6Pf7z_DkVCxJaE4LgwiYaEUfz1BatX`
+   - API Key: `[REDACTED - configurată în Supabase Auth Settings]`
    - Host: `smtp.resend.com`
    - Port: `465`
    - **Beneficiu**: Utilizatorii vor putea reseta parola prin email
