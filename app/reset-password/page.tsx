@@ -1,32 +1,26 @@
 /**
- * PAGINA: RESET PASSWORD (Setare parolă nouă)
+ * PAGINA: RESET PASSWORD (Setare parolă nouă cu Supabase Auth)
  *
  * EXPLICAȚIE:
  * User-ul a dat click pe link-ul din email și setează parola nouă.
+ * Supabase gestionează automat token-ul și validarea.
  */
 
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 function ResetPasswordForm() {
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const token = searchParams?.get("token");
-
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    if (!token) {
-      setError("Token lipsă. Link invalid.");
-    }
-  }, [token]);
+  const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -46,28 +40,21 @@ function ResetPasswordForm() {
     setLoading(true);
 
     try {
-      const response = await fetch("/api/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token,
-          newPassword,
-        }),
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: newPassword,
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess(true);
-        // Redirect către login după 3 secunde
-        setTimeout(() => {
-          router.push("/login");
-        }, 3000);
-      } else {
-        setError(data.error || "Eroare la resetarea parolei");
+      if (updateError) {
+        throw new Error(updateError.message);
       }
-    } catch (err) {
-      setError("Eroare de conexiune. Încearcă din nou.");
+
+      setSuccess(true);
+      // Redirect către login după 3 secunde
+      setTimeout(() => {
+        router.push("/login");
+      }, 3000);
+    } catch (err: any) {
+      setError(err.message || "Eroare la resetarea parolei");
     } finally {
       setLoading(false);
     }
@@ -103,7 +90,6 @@ function ResetPasswordForm() {
                   minLength={6}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                   placeholder="Minim 6 caractere"
-                  disabled={!token}
                 />
               </div>
 
@@ -119,7 +105,6 @@ function ResetPasswordForm() {
                   minLength={6}
                   className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
                   placeholder="Reintroduces parola"
-                  disabled={!token}
                 />
               </div>
 
@@ -131,7 +116,7 @@ function ResetPasswordForm() {
 
               <button
                 type="submit"
-                disabled={loading || !token}
+                disabled={loading}
                 className="w-full py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? "Se resetează..." : "🔑 Resetează Parola"}
