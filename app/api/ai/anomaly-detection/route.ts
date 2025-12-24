@@ -1,227 +1,107 @@
 /**
  * API ROUTE: AI ANOMALY DETECTION
  *
- * EXPLICAȚIE:
- * Detectează cheltuieli neobișnuite care ar putea indica fraude,
- * erori de categorizare, sau cheltuieli excesive.
- *
- * FLOW:
- * 1. Colectăm tranzacții recente (ultimele 7 zile)
- * 2. Calculăm media istorică pe categorii (ultimele 3 luni)
- * 3. Trimitem către Claude AI pentru analiză
- * 4. Returnăm anomalii detectate cu severitate și sugestii
+ * Detectează cheltuieli neobișnuite sau pattern-uri suspecte.
  */
 
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/get-current-user";
 import { db, schema } from "@/lib/db";
-import { eq, and, gte, lte } from "drizzle-orm";
-import { detectAnomalies } from "@/lib/ai/claude";
+import { eq, and, gte } from "drizzle-orm";
 
-/**
- * GET /api/ai/anomaly-detection
- *
- * Headers:
- * - Authorization: Bearer {token}
- *
- * Response:
- * {
- *   "anomalies": [
- *     {
- *       "description": "Cheltuială neobișnuit de mare la restaurant",
- *       "amount": 850,
- *       "category": "Divertisment",
- *       "date": "2024-12-10",
- *       "severity": "high",
- *       "suggestion": "Verifică dacă aceasta e o cheltuială validă"
- *     }
- *   ],
- *   "summary": {
- *     "totalAnomalies": 3,
- *     "highSeverity": 1,
- *     "mediumSeverity": 1,
- *     "lowSeverity": 1
- *   }
- * }
- */
 export async function GET(request: NextRequest) {
   try {
-    // PASUL 1: Verificăm autentificarea
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Neautentificat" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Neautentificat" },
+        { status: 401 }
+      );
     }
 
-    // PASUL 2: Colectăm tranzacții recente (ultimele 3 luni)
+    // Obținem tranzacțiile din ultimele 90 de zile
     const threeMonthsAgo = new Date();
-    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-    const threeMonthsAgoStr = threeMonthsAgo.toISOString().split('T')[0];
+    threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
+    const dateThreshold = threeMonthsAgo.toISOString().split('T')[0];
 
-    const recentTransactions = await db
+    const transactions = await db
       .select()
       .from(schema.transactions)
       .where(
         and(
           eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, threeMonthsAgoStr)
+          gte(schema.transactions.date, dateThreshold)
         )
       );
 
-    // PASUL 3: Colectăm date istorice (ultimele 12 luni)
-    const twelveMonthsAgo = new Date();
-    twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
-    const twelveMonthsAgoStr = twelveMonthsAgo.toISOString().split('T')[0];
-
-    const historicalTransactions = await db
-      .select()
-      .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, twelveMonthsAgoStr),
-          lte(schema.transactions.date, threeMonthsAgoStr) // Exclude recent pentru calcul medie
-        )
-      );
-
-    // Verificăm că avem suficiente date
-    if (recentTransactions.length === 0) {
+    if (transactions.length < 10) {
       return NextResponse.json({
         anomalies: [],
-        summary: {
-          totalAnomalies: 0,
-          highSeverity: 0,
-          mediumSeverity: 0,
-          lowSeverity: 0,
-          message: "Nu există tranzacții recente pentru analiză.",
-        },
+        message: "Insufficient data for anomaly detection",
       });
     }
 
-    if (historicalTransactions.length < 10) {
-      return NextResponse.json({
-        anomalies: [],
-        summary: {
-          totalAnomalies: 0,
-          highSeverity: 0,
-          mediumSeverity: 0,
-          lowSeverity: 0,
-          message: "Nu există suficiente date istorice pentru comparație.",
-        },
-      });
-    }
+    const anomalies: Array<{
+      description: string;
+      severity: "low" | "medium" | "high";
+      amount?: number;
+      date?: string;
+    }> = [];
 
-    // PASUL 4: Pregătim categoriile
-    const categories = await db
-      .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+    // 1. Detectăm cheltuieli mari (>2x media)
+    const expenses = transactions.filter(t => t.amount < 0);
+    if (expenses.length > 0) {
+      const avgExpense = expenses.reduce((sum, t) => sum + Math.abs(t.amount), 0) / expenses.length;
+      const largeExpenses = expenses.filter(t => Math.abs(t.amount) > avgExpense * 2);
 
-    const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));
-
-    // PASUL 5: Calculăm media istorică pe categorii
-    const historicalAverage: Record<string, number> = {};
-    const categoryCounts: Record<string, number> = {};
-
-    historicalTransactions.forEach((t) => {
-      const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
-      if (amount >= 0) return; // Skip venituri
-
-      const category = categoryMap.get(t.categoryId || "");
-      const categoryName = category?.name || "Necategorizat";
-
-      if (!historicalAverage[categoryName]) {
-        historicalAverage[categoryName] = 0;
-        categoryCounts[categoryName] = 0;
+      for (const exp of largeExpenses.slice(0, 3)) {
+        const descShort = exp.description.length > 30 ? exp.description.slice(0, 30) + "..." : exp.description;
+        anomalies.push({
+          description: `Cheltuială mare: ${descShort}`,
+          severity: Math.abs(exp.amount) > avgExpense * 3 ? "high" : "medium",
+          amount: exp.amount,
+          date: exp.date,
+        });
       }
+    }
 
-      historicalAverage[categoryName] += Math.abs(amount);
-      categoryCounts[categoryName] += 1;
-    });
-
-    // Calculăm media lunară (împărțim la 3 luni)
-    Object.keys(historicalAverage).forEach((cat) => {
-      historicalAverage[cat] = historicalAverage[cat] / 3; // Media pe 3 luni
-    });
-
-    // PASUL 6: Pregătim recent transactions pentru AI
-    const recentData = recentTransactions
-      .filter((t) => {
-        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
-        return amount < 0; // Doar cheltuieli
-      })
-      .map((t) => {
-        const amount = typeof t.amount === 'string' ? parseFloat(t.amount) : t.amount;
-        const category = categoryMap.get(t.categoryId || "");
-        return {
-          description: t.description,
-          amount: Math.abs(amount),
-          category: category?.name || "Necategorizat",
-          date: t.date, // Already in YYYY-MM-DD format
-        };
+    // 2. Detectăm tranzacții necategorizate
+    const uncategorized = transactions.filter(t => !t.categoryId);
+    if (uncategorized.length > transactions.length * 0.3) {
+      anomalies.push({
+        description: `${uncategorized.length} tranzacții necategorizate`,
+        severity: "low",
       });
+    }
 
-    // PASUL 7: Apelăm Claude AI
-    console.log(`🚨 Detecting anomalies for ${user.email}...`);
-    console.log(`Recent transactions: ${recentData.length}`);
-    console.log(`Historical averages:`, historicalAverage);
+    // 3. Detectăm cheltuieli frecvente la aceeași merchant
+    const merchantCounts: Record<string, number> = {};
+    for (const t of transactions.filter(t => t.amount < 0)) {
+      const desc = t.description.slice(0, 20);
+      merchantCounts[desc] = (merchantCounts[desc] || 0) + 1;
+    }
 
-    const anomalies = await detectAnomalies({
-      recentTransactions: recentData,
-      historicalAverage,
-      currency: user.nativeCurrency || "RON",
-    });
+    const frequentMerchants = Object.entries(merchantCounts)
+      .filter(([_, count]) => count > 5)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 2);
 
-    // PASUL 8: Calculăm summary
-    const summary = {
-      totalAnomalies: anomalies.length,
-      highSeverity: anomalies.filter((a) => a.severity === "high").length,
-      mediumSeverity: anomalies.filter((a) => a.severity === "medium").length,
-      lowSeverity: anomalies.filter((a) => a.severity === "low").length,
-    };
+    for (const [merchant, count] of frequentMerchants) {
+      anomalies.push({
+        description: `${count} tranzacții la ${merchant}...`,
+        severity: "low",
+      });
+    }
 
-    console.log(`✅ Detected ${anomalies.length} anomalies`);
-
-    // PASUL 9: Returnăm rezultatele
     return NextResponse.json({
-      anomalies,
-      summary,
-      period: {
-        recent: {
-          startDate: threeMonthsAgo.toISOString(),
-          endDate: new Date().toISOString(),
-        },
-        historical: {
-          startDate: twelveMonthsAgo.toISOString(),
-          endDate: threeMonthsAgo.toISOString(),
-        },
-      },
+      anomalies: anomalies.slice(0, 5), // Max 5 anomalii
+      totalTransactions: transactions.length,
     });
-  } catch (error: any) {
-    console.error("❌ Anomaly detection error:", error);
+  } catch (error) {
+    console.error("Anomaly detection error:", error);
     return NextResponse.json(
       { error: "Eroare la detectarea anomaliilor" },
       { status: 500 }
     );
   }
 }
-
-/**
- * PENTRU CURSANȚI: USE CASES REALE
- *
- * 1. **Fraud Detection**
- *    - Tranzacții neașteptate (ex: 5000 RON la supermarket)
- *    - Cheltuieli în locații străine
- *    - Pattern-uri suspecte
- *
- * 2. **Budget Alerts**
- *    - "Ai cheltuit 2x mai mult la restaurant decât de obicei"
- *    - Real-time notifications
- *
- * 3. **Categorization Errors**
- *    - "Mega Image" categorizat greșit ca "Transport"
- *    - Sugestie de re-categorizare
- *
- * 4. **Smart Insights**
- *    - "De obicei cheltuiești 300 RON/lună la Divertisment"
- *    - "Luna aceasta: 800 RON - verifică dacă totul e OK"
- */
