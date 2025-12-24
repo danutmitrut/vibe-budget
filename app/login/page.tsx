@@ -125,6 +125,16 @@ export default function LoginPage() {
           </button>
         </form>
 
+        {/* Link către Forgot Password */}
+        <div className="mt-4 text-center">
+          <Link
+            href="/forgot-password"
+            className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+          >
+            Ai uitat parola?
+          </Link>
+        </div>
+
         {/* Link către Register */}
         <div className="mt-6 text-center text-sm text-gray-800">
           Nu ai cont?{" "}
