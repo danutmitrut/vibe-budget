@@ -1,9 +1,9 @@
 /**
- * PAGINA: REGISTER (Înregistrare utilizator nou)
+ * PAGINA: REGISTER (Înregistrare cu Supabase Auth)
  *
  * EXPLICAȚIE:
- * Aceasta este pagina unde utilizatorii noi își creează contul.
- * Conține un formular cu câmpuri pentru email, parolă, nume și monedă nativă.
+ * Utilizează Supabase Authentication pentru înregistrare securizată.
+ * Datele custom (name, nativeCurrency) sunt salvate în tabela `users`.
  */
 
 "use client";
@@ -11,9 +11,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function RegisterPage() {
-  // PASUL 1: State management (gestionarea datelor formularului)
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
@@ -23,44 +23,58 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const supabase = createClient();
 
-  // PASUL 2: Funcția de submit (când user apasă butonul "Înregistrare")
   const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault(); // Previne refresh-ul paginii
+    e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      // Trimitem datele la backend
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
+      // Pas 1: Creează cont în Supabase Auth
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            name: formData.name,
+            native_currency: formData.nativeCurrency,
+          },
         },
-        body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Eroare: afișăm mesajul de eroare
-        throw new Error(data.error || "Eroare la înregistrare");
+      if (signUpError) {
+        throw new Error(signUpError.message);
       }
 
-      // Succes: salvăm token-ul în localStorage
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      if (!authData.user) {
+        throw new Error("Nu s-a putut crea utilizatorul");
+      }
 
-      // Redirectăm la dashboard
+      // Pas 2: Salvează datele custom în tabela users
+      const { error: insertError } = await supabase
+        .from("users")
+        .insert({
+          id: authData.user.id,
+          email: formData.email,
+          name: formData.name,
+          native_currency: formData.nativeCurrency,
+        });
+
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
+      // Succes - redirect la dashboard
       router.push("/dashboard");
+      router.refresh();
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Eroare la înregistrare");
     } finally {
       setLoading(false);
     }
   };
 
-  // PASUL 3: Render UI (interfața vizuală)
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
@@ -112,7 +126,7 @@ export default function RegisterPage() {
                 setFormData({ ...formData, email: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
-              placeholder="exemplu@email.com"
+              placeholder="dan@example.com"
             />
           </div>
 
@@ -138,26 +152,26 @@ export default function RegisterPage() {
             />
           </div>
 
-          {/* Câmp: Monedă Nativă */}
+          {/* Câmp: Monedă nativă */}
           <div>
             <label
-              htmlFor="nativeCurrency"
+              htmlFor="currency"
               className="block text-sm font-medium text-gray-700 mb-2"
             >
-              Moneda nativă
+              Monedă nativă
             </label>
             <select
-              id="nativeCurrency"
+              id="currency"
               value={formData.nativeCurrency}
               onChange={(e) =>
                 setFormData({ ...formData, nativeCurrency: e.target.value })
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
             >
-              <option value="RON">RON (Leu românesc)</option>
-              <option value="MDL">MDL (Leu moldovenesc)</option>
+              <option value="RON">RON (Lei românești)</option>
+              <option value="MDL">MDL (Lei moldovenești)</option>
               <option value="EUR">EUR (Euro)</option>
-              <option value="USD">USD (Dolar american)</option>
+              <option value="USD">USD (Dolari americani)</option>
             </select>
           </div>
 

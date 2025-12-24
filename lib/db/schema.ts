@@ -23,20 +23,10 @@ import { createId } from "@paralleldrive/cuid2";
  */
 export const users = pgTable("users", {
   id: text("id")
-    .primaryKey()
-    .$defaultFn(() => createId()), // Generează automat un ID unic
+    .primaryKey(), // ID-ul vine de la Supabase Auth (auth.users.id)
   email: text("email").notNull().unique(), // Email-ul trebuie să fie unic
-  password: text("password").notNull(), // Parola (criptată cu bcrypt)
   name: text("name").notNull(),
   nativeCurrency: text("native_currency").notNull().default("RON"), // RON sau MDL
-
-  // EMAIL VERIFICATION
-  emailVerified: boolean("email_verified").notNull().default(false),
-  verificationToken: text("verification_token"),
-
-  // PASSWORD RESET
-  resetToken: text("reset_token"),
-  resetTokenExpiry: timestamp("reset_token_expiry"),
 
   createdAt: timestamp("created_at")
     .notNull()

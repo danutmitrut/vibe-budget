@@ -1,9 +1,9 @@
 /**
- * PAGINA: LOGIN (Autentificare utilizator existent)
+ * PAGINA: LOGIN (Autentificare cu Supabase Auth)
  *
  * EXPLICAȚIE:
- * Aceasta este pagina unde utilizatorii existenți se autentifică.
- * Conține un formular simplu cu email și parolă.
+ * Utilizează Supabase Authentication pentru login securizat.
+ * RLS (Row Level Security) asigură că users văd doar datele proprii.
  */
 
 "use client";
@@ -11,9 +11,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
-  // PASUL 1: State management
   const router = useRouter();
   const [formData, setFormData] = useState({
     email: "",
@@ -21,43 +21,38 @@ export default function LoginPage() {
   });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const supabase = createClient();
 
-  // PASUL 2: Funcția de submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      // Trimitem datele la backend
-      const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+      // Autentificare cu Supabase Auth
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: formData.email,
+        password: formData.password,
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Eroare la autentificare");
+      if (signInError) {
+        throw new Error(signInError.message);
       }
 
-      // Succes: salvăm token-ul
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("user", JSON.stringify(data.user));
+      if (!data.session) {
+        throw new Error("Nu s-a putut crea sesiunea");
+      }
 
-      // Redirectăm la dashboard
+      // Succes - redirect la dashboard
       router.push("/dashboard");
+      router.refresh(); // Refresh pentru a actualiza session
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || "Eroare la autentificare");
     } finally {
       setLoading(false);
     }
   };
 
-  // PASUL 3: Render UI
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">

@@ -1,42 +1,34 @@
 /**
- * SUPABASE CLIENT - Browser & Server
+ * SUPABASE CLIENT - Browser-Side (Client Components)
  *
- * Configurare client Supabase pentru Next.js App Router
+ * Pentru use în Client Components (componente cu "use client")
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 
-// Environment variables
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
+export function createClient() {
+  return createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
 }
 
-// Client pentru browser (folosește anon key - public safe)
-export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-});
-
 /**
- * PENTRU CURSANȚI: De ce 2 environment variables?
+ * PENTRU CURSANȚI: De ce folosim Supabase Auth?
  *
- * 1. NEXT_PUBLIC_SUPABASE_URL
- *    - Public, expus în browser
- *    - URL-ul proiectului Supabase
+ * 1. SECURITATE AUTOMATĂ
+ *    - Row Level Security (RLS) funcționează automat
+ *    - Fiecare user vede doar propriile date
+ *    - Zero configurare manuală JWT
  *
- * 2. NEXT_PUBLIC_SUPABASE_ANON_KEY
- *    - Public, expus în browser (SAFE!)
- *    - Protejat de Row Level Security (RLS)
- *    - Users pot accesa doar propriile date
+ * 2. FEATURES GRATUITE
+ *    - Email verification automată
+ *    - Password reset cu email
+ *    - Social auth (Google, GitHub, etc.)
+ *    - Session management automat
  *
- * 3. SUPABASE_SERVICE_ROLE_KEY (nu îl folosim aici)
- *    - SECRET, DOAR server-side
- *    - Bypass RLS - admin access
- *    - NICIODATĂ în browser!
+ * 3. BEST PRACTICES
+ *    - Cookies secure HTTP-only
+ *    - CSRF protection built-in
+ *    - Auto-refresh tokens
  */
