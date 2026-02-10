@@ -1,9 +1,0 @@
-Date,Time,Time Zone,Name,Type,Status,Currency,Gross,Fee,Net,From Email Address,To Email Address,Transaction ID,Item Title,Item ID,Reference Txn ID,Receipt ID,Balance,Note
-15/09/2024,10:30:45,EEST,Udemy Online Courses,Payment,Completed,USD,-49.99,-2.50,-52.49,you@email.com,udemy@udemy.com,1ABC123DEF,Complete Web Dev Bootcamp,,,REC-123,450.00,
-18/09/2024,14:20:30,EEST,Fiverr Services,Payment,Completed,USD,-150.00,-7.50,-157.50,you@email.com,seller@fiverr.com,2ABC456GHI,Logo Design Service,,,REC-456,292.50,
-20/09/2024,09:15:00,EEST,Client Payment,Payment Received,Completed,EUR,850.00,0.00,850.00,client@company.com,you@email.com,3ABC789JKL,Web Development Project,,,REC-789,1142.50,Proiect finalizat
-22/09/2024,16:45:12,EEST,Envato Market,Payment,Completed,USD,-29.00,-1.45,-30.45,you@email.com,envato@market.com,4ABC012MNO,WordPress Theme,,,REC-012,1112.05,
-25/09/2024,11:30:00,EEST,Adobe Creative Cloud,Subscription,Completed,USD,-54.99,-2.75,-57.74,you@email.com,adobe@adobe.com,5ABC345PQR,Monthly Subscription,,,REC-345,1054.31,
-27/09/2024,18:00:00,EEST,GitHub Pro,Subscription,Completed,USD,-4.00,-0.20,-4.20,you@email.com,github@github.com,6ABC678STU,GitHub Pro Plan,,,REC-678,1050.11,
-28/09/2024,13:45:30,EEST,Freelance Project,Payment Received,Completed,USD,320.00,0.00,320.00,startup@email.com,you@email.com,7ABC901VWX,Landing Page Design,,,REC-901,1370.11,Payment for services
-30/09/2024,10:00:00,EEST,Coursera Course,Payment,Completed,USD,-39.99,-2.00,-41.99,you@email.com,coursera@coursera.com,8ABC234YZ1,Data Science Specialization,,,REC-234,1328.12,
