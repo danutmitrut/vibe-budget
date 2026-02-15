@@ -25,10 +25,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // SHARED MODE: Toți userii văd toate valutele
     const currencies = await db
       .select()
-      .from(schema.currencies)
-      .where(eq(schema.currencies.userId, user.id));
+      .from(schema.currencies);
 
     return NextResponse.json({ currencies });
   } catch (error) {

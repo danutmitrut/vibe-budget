@@ -42,14 +42,8 @@ export async function GET(request: NextRequest) {
     const endDate = searchParams.get("endDate");
     const limit = parseInt(searchParams.get("limit") || "100");
 
-    // Construim query-ul cu filtre
-    let query = db
-      .select()
-      .from(schema.transactions)
-      .where(eq(schema.transactions.userId, user.id));
-
-    // Adăugăm filtre dacă există
-    const conditions = [eq(schema.transactions.userId, user.id)];
+    // SHARED MODE: Construim query-ul cu filtre (fără userId)
+    const conditions: any[] = [];
 
     if (bankId) {
       conditions.push(eq(schema.transactions.bankId, bankId));
@@ -67,10 +61,11 @@ export async function GET(request: NextRequest) {
       conditions.push(lte(schema.transactions.date, endDate));
     }
 
+    // SHARED MODE: Query fără filtrare userId
     const transactions = await db
       .select()
       .from(schema.transactions)
-      .where(and(...conditions))
+      .where(conditions.length > 0 ? and(...conditions) : undefined)
       .orderBy(desc(schema.transactions.date))
       .limit(limit);
 
@@ -131,11 +126,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PASUL 1: Obținem categoriile utilizatorului (pentru auto-categorizare)
+    // PASUL 1: Obținem toate categoriile (shared mode)
     const userCategories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
 

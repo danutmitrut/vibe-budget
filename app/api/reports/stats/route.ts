@@ -46,31 +46,28 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Obținem toate tranzacțiile din interval
+    // SHARED MODE: Toate tranzacțiile din interval
     const transactions = await db
       .select()
       .from(schema.transactions)
       .where(
         and(
-          eq(schema.transactions.userId, user.id),
           gte(schema.transactions.date, startDate),
           lte(schema.transactions.date, endDate)
         )
       );
 
-    // Obținem categoriile pentru lookup
+    // SHARED MODE: Toate categoriile pentru lookup
     const categories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     const categoryMap = new Map(categories.map((c) => [c.id, c]));
 
-    // Obținem băncile pentru lookup
+    // SHARED MODE: Toate băncile pentru lookup
     const banks = await db
       .select()
-      .from(schema.banks)
-      .where(eq(schema.banks.userId, user.id));
+      .from(schema.banks);
 
     const bankMap = new Map(banks.map((b) => [b.id, b]));
 

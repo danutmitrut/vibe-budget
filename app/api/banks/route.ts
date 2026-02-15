@@ -15,7 +15,7 @@ import { eq } from "drizzle-orm";
 /**
  * GET /api/banks
  *
- * Returnează toate băncile utilizatorului autentificat.
+ * Returnează TOATE băncile (shared mode - toți userii văd toate datele).
  */
 export async function GET(request: NextRequest) {
   try {
@@ -28,11 +28,10 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obținem băncile utilizatorului
+    // Obținem TOATE băncile (shared access)
     const banks = await db
       .select()
-      .from(schema.banks)
-      .where(eq(schema.banks.userId, user.id));
+      .from(schema.banks);
 
     return NextResponse.json({ banks });
   } catch (error) {
@@ -47,7 +46,7 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/banks
  *
- * Adaugă o bancă nouă pentru utilizatorul autentificat.
+ * Adaugă o bancă nouă (userId salvat pentru tracking, dar vizibilă pentru toți).
  *
  * Body:
  * {

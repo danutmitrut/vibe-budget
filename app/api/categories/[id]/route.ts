@@ -28,20 +28,15 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verificăm că categoria aparține userului
+    // Verificăm că categoria există (shared mode)
     const categories = await db
       .select()
       .from(schema.categories)
-      .where(
-        and(
-          eq(schema.categories.id, id),
-          eq(schema.categories.userId, user.id)
-        )
-      );
+      .where(eq(schema.categories.id, id));
 
     if (categories.length === 0) {
       return NextResponse.json(
-        { error: "Categoria nu există sau nu îți aparține" },
+        { error: "Categoria nu există" },
         { status: 404 }
       );
     }

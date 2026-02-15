@@ -14,7 +14,7 @@ import { eq, and } from "drizzle-orm";
 /**
  * DELETE /api/banks/[id]
  *
- * Șterge o bancă a utilizatorului.
+ * Șterge orice bancă (shared mode - orice user poate șterge orice).
  */
 export async function DELETE(
   request: NextRequest,
@@ -32,20 +32,15 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verificăm că banca aparține userului
+    // Verificăm că banca există (fără verificare ownership)
     const banks = await db
       .select()
       .from(schema.banks)
-      .where(
-        and(
-          eq(schema.banks.id, id),
-          eq(schema.banks.userId, user.id)
-        )
-      );
+      .where(eq(schema.banks.id, id));
 
     if (banks.length === 0) {
       return NextResponse.json(
-        { error: "Banca nu există sau nu îți aparține" },
+        { error: "Banca nu există" },
         { status: 404 }
       );
     }

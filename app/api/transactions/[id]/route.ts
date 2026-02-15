@@ -37,20 +37,15 @@ export async function PATCH(
     const { id } = await params;
     const body = await request.json();
 
-    // Verificăm că tranzacția aparține userului
+    // SHARED MODE: Verificăm doar că tranzacția există
     const existing = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.id, id),
-          eq(schema.transactions.userId, user.id)
-        )
-      );
+      .where(eq(schema.transactions.id, id));
 
     if (existing.length === 0) {
       return NextResponse.json(
-        { error: "Tranzacția nu există sau nu îți aparține" },
+        { error: "Tranzacția nu există" },
         { status: 404 }
       );
     }
@@ -95,20 +90,15 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verificăm că tranzacția aparține userului
+    // SHARED MODE: Verificăm doar că tranzacția există
     const existing = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.id, id),
-          eq(schema.transactions.userId, user.id)
-        )
-      );
+      .where(eq(schema.transactions.id, id));
 
     if (existing.length === 0) {
       return NextResponse.json(
-        { error: "Tranzacția nu există sau nu îți aparține" },
+        { error: "Tranzacția nu există" },
         { status: 404 }
       );
     }

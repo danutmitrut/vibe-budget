@@ -25,19 +25,15 @@ export async function DELETE(
 
     const { id } = await params;
 
+    // SHARED MODE: Verificăm doar că valuta există (fără verificare ownership)
     const currencies = await db
       .select()
       .from(schema.currencies)
-      .where(
-        and(
-          eq(schema.currencies.id, id),
-          eq(schema.currencies.userId, user.id)
-        )
-      );
+      .where(eq(schema.currencies.id, id));
 
     if (currencies.length === 0) {
       return NextResponse.json(
-        { error: "Valuta nu există sau nu îți aparține" },
+        { error: "Valuta nu există" },
         { status: 404 }
       );
     }

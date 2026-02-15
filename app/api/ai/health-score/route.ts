@@ -24,15 +24,11 @@ export async function GET(request: NextRequest) {
     threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
     const dateThreshold = threeMonthsAgo.toISOString().split('T')[0];
 
+    // SHARED MODE: Toate tranzacțiile din ultimele 90 zile
     const transactions = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, dateThreshold)
-        )
-      );
+      .where(gte(schema.transactions.date, dateThreshold));
 
     if (transactions.length === 0) {
       return NextResponse.json({

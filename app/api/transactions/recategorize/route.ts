@@ -43,16 +43,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // PASUL 1: Obținem toate tranzacțiile NECATEGORIZATE ale utilizatorului
+    // PASUL 1: SHARED MODE - Obținem toate tranzacțiile NECATEGORIZATE
     const uncategorizedTransactions = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.userId, user.id),
-          isNull(schema.transactions.categoryId)
-        )
-      );
+      .where(isNull(schema.transactions.categoryId));
 
     console.log(`🔄 Re-categorizare: ${uncategorizedTransactions.length} tranzacții necategorizate găsite pentru ${user.email}`);
 
@@ -65,11 +60,10 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // PASUL 2: Obținem categoriile utilizatorului
+    // PASUL 2: SHARED MODE - Obținem toate categoriile
     const userCategories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
 

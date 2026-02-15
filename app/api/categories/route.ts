@@ -29,8 +29,7 @@ export async function GET(request: NextRequest) {
 
     const categories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     return NextResponse.json({ categories });
   } catch (error) {

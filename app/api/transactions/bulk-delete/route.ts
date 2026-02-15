@@ -39,20 +39,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificăm că toate tranzacțiile aparțin userului
+    // SHARED MODE: Verificăm doar că tranzacțiile există
     const existingTransactions = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          inArray(schema.transactions.id, transactionIds),
-          eq(schema.transactions.userId, user.id)
-        )
-      );
+      .where(inArray(schema.transactions.id, transactionIds));
 
     if (existingTransactions.length !== transactionIds.length) {
       return NextResponse.json(
-        { error: "Unele tranzacții nu există sau nu îți aparțin" },
+        { error: "Unele tranzacții nu există" },
         { status: 403 }
       );
     }
@@ -60,12 +55,7 @@ export async function POST(request: NextRequest) {
     // Ștergem tranzacțiile
     await db
       .delete(schema.transactions)
-      .where(
-        and(
-          inArray(schema.transactions.id, transactionIds),
-          eq(schema.transactions.userId, user.id)
-        )
-      );
+      .where(inArray(schema.transactions.id, transactionIds));
 
     return NextResponse.json({
       message: `${transactionIds.length} tranzacții șterse cu succes`,

@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     startDate.setHours(0, 0, 0, 0);
     const startDateStr = startDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
 
-    // Fetch toate tranzacțiile din ultimele N luni
+    // SHARED MODE: Toate tranzacțiile din ultimele N luni
     const transactions = await db
       .select({
         id: schema.transactions.id,
@@ -70,18 +70,12 @@ export async function GET(request: NextRequest) {
         date: schema.transactions.date,
       })
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, startDateStr)
-        )
-      );
+      .where(gte(schema.transactions.date, startDateStr));
 
-    // Fetch categorii
+    // SHARED MODE: Toate categoriile
     const categories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     // Creăm un map pentru lookup rapid
     const categoryMap = new Map(

@@ -55,15 +55,11 @@ export async function GET(request: NextRequest) {
     const twelveMonthsAgo = new Date();
     twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
 
+    // SHARED MODE: Toate tranzacțiile din ultimele 12 luni
     const transactions = await db
       .select()
       .from(schema.transactions)
-      .where(
-        and(
-          eq(schema.transactions.userId, user.id),
-          gte(schema.transactions.date, twelveMonthsAgo.toISOString().split("T")[0])
-        )
-      );
+      .where(gte(schema.transactions.date, twelveMonthsAgo.toISOString().split("T")[0]));
 
     if (transactions.length === 0) {
       return NextResponse.json({
@@ -72,11 +68,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // PASUL 3: Calculăm venit și cheltuieli pe categorii
+    // PASUL 3: SHARED MODE - Obținem toate categoriile
     const categories = await db
       .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, user.id));
+      .from(schema.categories);
 
     // Map category IDs to names
     const categoryMap = new Map(categories.map((cat) => [cat.id, cat]));

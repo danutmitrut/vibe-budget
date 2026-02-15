@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Obținem keyword-urile cu detalii categorie
+    // SHARED MODE: Toți userii văd toate keyword-urile
     const keywords = await db
       .select({
         id: schema.userKeywords.id,
@@ -46,8 +46,7 @@ export async function GET(request: NextRequest) {
       .leftJoin(
         schema.categories,
         eq(schema.userKeywords.categoryId, schema.categories.id)
-      )
-      .where(eq(schema.userKeywords.userId, user.id));
+      );
 
     return NextResponse.json({ keywords });
   } catch (error) {
@@ -89,16 +88,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verificăm dacă keyword-ul există deja pentru acest user
+    // SHARED MODE: Verificăm dacă keyword-ul există deja (global, nu per user)
     const existingKeyword = await db
       .select()
       .from(schema.userKeywords)
-      .where(
-        and(
-          eq(schema.userKeywords.userId, user.id),
-          eq(schema.userKeywords.keyword, keyword.toLowerCase().trim())
-        )
-      )
+      .where(eq(schema.userKeywords.keyword, keyword.toLowerCase().trim()))
       .limit(1);
 
     if (existingKeyword.length > 0) {
@@ -168,15 +162,10 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // Ștergem doar dacă aparține utilizatorului
+    // SHARED MODE: Oricine poate șterge orice keyword
     await db
       .delete(schema.userKeywords)
-      .where(
-        and(
-          eq(schema.userKeywords.id, keywordId),
-          eq(schema.userKeywords.userId, user.id)
-        )
-      );
+      .where(eq(schema.userKeywords.id, keywordId));
 
     return NextResponse.json({ message: "Keyword șters cu succes" });
   } catch (error) {
