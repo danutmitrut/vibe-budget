@@ -10,6 +10,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface Category {
   id: string;
@@ -24,6 +25,7 @@ interface Category {
 
 export default function CategoriesPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -39,12 +41,33 @@ export default function CategoriesPage() {
     fetchCategories();
   }, []);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   const fetchCategories = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch("/api/categories", {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Eroare la încărcarea categoriilor");
@@ -64,13 +87,14 @@ export default function CategoriesPage() {
     setAdding(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify(newCategory),
       });
 
@@ -92,10 +116,11 @@ export default function CategoriesPage() {
     if (!confirm("Sigur vrei să ștergi această categorie?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`/api/categories/${id}`, {
         method: "DELETE",
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Eroare la ștergerea categoriei");

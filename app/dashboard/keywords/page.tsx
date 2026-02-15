@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 interface UserKeyword {
   id: string;
@@ -25,6 +26,7 @@ interface UserKeyword {
 
 export default function KeywordsPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [keywords, setKeywords] = useState<UserKeyword[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -35,12 +37,33 @@ export default function KeywordsPage() {
     fetchKeywords();
   }, []);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   const fetchKeywords = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch("/api/user-keywords", {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) {
@@ -48,7 +71,8 @@ export default function KeywordsPage() {
           router.push("/login");
           return;
         }
-        throw new Error("Eroare la încărcarea keyword-urilor");
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la încărcarea keyword-urilor");
       }
 
       const data = await response.json();
@@ -67,13 +91,17 @@ export default function KeywordsPage() {
 
     setDeletingId(keywordId);
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`/api/user-keywords?id=${keywordId}`, {
         method: "DELETE",
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Eroare la ștergerea keyword-ului");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la ștergerea keyword-ului");
+      }
 
       setKeywords(keywords.filter((k) => k.id !== keywordId));
       toast.success(`Keyword "${keywordName}" șters cu succes!`);
@@ -105,17 +133,24 @@ export default function KeywordsPage() {
     }
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
 
       // Ștergem în paralel toate keyword-urile
-      await Promise.all(
+      const responses = await Promise.all(
         filteredKeywords.map((k) =>
           fetch(`/api/user-keywords?id=${k.id}`, {
             method: "DELETE",
-            
+            headers: authHeaders,
+            credentials: "include",
           })
         )
       );
+
+      const failedResponse = responses.find((response) => !response.ok);
+      if (failedResponse) {
+        const data = await failedResponse.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la ștergerea în masă");
+      }
 
       // Actualizăm state-ul
       setKeywords(
@@ -126,7 +161,7 @@ export default function KeywordsPage() {
 
       toast.success(`${filteredKeywords.length} keyword-uri șterse cu succes!`);
     } catch (err: any) {
-      toast.error("Eroare la ștergerea în masă");
+      toast.error(err.message || "Eroare la ștergerea în masă");
     }
   };
 

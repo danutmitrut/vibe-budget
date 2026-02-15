@@ -15,6 +15,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface PivotCell {
   amount: number;
@@ -44,6 +45,7 @@ interface PivotData {
 
 export default function PivotReportPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [pivotData, setPivotData] = useState<PivotData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -54,15 +56,39 @@ export default function PivotReportPage() {
     fetchPivotData();
   }, [monthsCount]);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   const fetchPivotData = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch(`/api/reports/pivot?months=${monthsCount}`, {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Eroare la încărcarea datelor");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la încărcarea datelor");
+      }
 
       const data = await response.json();
       setPivotData(data);

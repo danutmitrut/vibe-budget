@@ -20,12 +20,14 @@ export default function LoginPage() {
     password: "",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -36,6 +38,15 @@ export default function LoginPage() {
       });
 
       if (signInError) {
+        const message = signInError.message.toLowerCase();
+        if (message.includes("email not confirmed") || message.includes("not confirmed")) {
+          await supabase.auth.resend({
+            type: "signup",
+            email: formData.email,
+          });
+          setSuccess("Emailul nu este confirmat. Am retrimis emailul de confirmare.");
+          return;
+        }
         throw new Error(signInError.message);
       }
 
@@ -43,11 +54,30 @@ export default function LoginPage() {
         throw new Error("Nu s-a putut crea sesiunea");
       }
 
+      // Compatibilitate cu API routes care folosesc Authorization: Bearer
+      localStorage.setItem("token", data.session.access_token);
+
+      // Asigurăm existența profilului în public.users pentru dashboard.
+      const defaultName = data.user?.user_metadata?.name || formData.email.split("@")[0] || "Utilizator";
+      const defaultCurrency = data.user?.user_metadata?.native_currency || "RON";
+      await supabase
+        .from("users")
+        .upsert(
+          {
+            id: data.user.id,
+            email: data.user.email || formData.email,
+            name: defaultName,
+            native_currency: defaultCurrency,
+          },
+          { onConflict: "id" }
+        );
+
       // Succes - redirect la dashboard
       router.push("/dashboard");
       router.refresh(); // Refresh pentru a actualiza session
-    } catch (err: any) {
-      setError(err.message || "Eroare la autentificare");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Eroare la autentificare";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -112,6 +142,12 @@ export default function LoginPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+              {success}
             </div>
           )}
 

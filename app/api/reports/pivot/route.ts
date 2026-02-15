@@ -14,9 +14,9 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and, gte, sql } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+import { ensureDefaultSystemCategories } from "@/lib/categories/default-system-categories";
+import { isBalanceSnapshotDescription } from "@/lib/transactions/balance-snapshot";
 
 interface PivotCell {
   amount: number;
@@ -38,18 +38,101 @@ interface PivotRow {
   maxDecrease: { month: string; change: number };
 }
 
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
+
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const fallbackName =
+    (user.user_metadata?.name as string | undefined) ||
+    user.email?.split("@")[0] ||
+    "Utilizator";
+  const fallbackCurrency =
+    (user.user_metadata?.native_currency as string | undefined) || "RON";
+
+  let effectiveUserId = user.id;
+
+  const { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email || `${user.id}@placeholder.local`,
+        name: fallbackName,
+        native_currency: fallbackCurrency,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertUserError) {
+    if (upsertUserError.message.includes("users_email_key") && user.email) {
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id, native_currency")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (existingUserError || !existingUser) {
+        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
+      }
+
+      effectiveUserId = existingUser.id;
+      return {
+        id: effectiveUserId,
+        nativeCurrency: existingUser.native_currency || fallbackCurrency,
+      };
+    }
+
+    throw new Error(upsertUserError.message);
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("native_currency")
+    .eq("id", effectiveUserId)
+    .maybeSingle();
+
+  return {
+    id: effectiveUserId,
+    nativeCurrency: profile?.native_currency || fallbackCurrency,
+  };
+}
+
 /**
  * GET /api/reports/pivot?months=12
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+    const profile = await ensureUserProfile(supabase, user);
+    await ensureDefaultSystemCategories(supabase, profile.id);
 
     const { searchParams } = new URL(request.url);
     const monthsCount = parseInt(searchParams.get("months") || "12", 10);
@@ -62,20 +145,27 @@ export async function GET(request: NextRequest) {
     const startDateStr = startDate.toISOString().split('T')[0]; // Convert to YYYY-MM-DD
 
     // SHARED MODE: Toate tranzacțiile din ultimele N luni
-    const transactions = await db
-      .select({
-        id: schema.transactions.id,
-        categoryId: schema.transactions.categoryId,
-        amount: schema.transactions.amount,
-        date: schema.transactions.date,
-      })
-      .from(schema.transactions)
-      .where(gte(schema.transactions.date, startDateStr));
+    const { data: transactionsData, error: transactionsError } = await supabase
+      .from("transactions")
+      .select("id, category_id, amount, date, description")
+      .gte("date", startDateStr);
+
+    if (transactionsError) {
+      throw new Error(transactionsError.message);
+    }
+    const transactions = (transactionsData || []).filter(
+      (transaction) => !isBalanceSnapshotDescription(transaction.description)
+    );
 
     // SHARED MODE: Toate categoriile
-    const categories = await db
-      .select()
-      .from(schema.categories);
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from("categories")
+      .select("id, name, icon, color");
+
+    if (categoriesError) {
+      throw new Error(categoriesError.message);
+    }
+    const categories = categoriesData || [];
 
     // Creăm un map pentru lookup rapid
     const categoryMap = new Map(
@@ -125,12 +215,12 @@ export async function GET(request: NextRequest) {
 
     // Populăm datele din tranzacții
     transactions.forEach((tx) => {
-      if (!tx.categoryId) return; // Skip necategorizate
+      if (!tx.category_id) return; // Skip necategorizate
 
       const txDate = new Date(tx.date);
       const month = `${txDate.getFullYear()}-${String(txDate.getMonth() + 1).padStart(2, "0")}`;
 
-      const row = pivotData.get(tx.categoryId);
+      const row = pivotData.get(tx.category_id);
       if (!row || !row.months[month]) return;
 
       // Adunăm sumele (în valoare absolută pentru cheltuieli)
@@ -205,7 +295,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       months: monthsList,
       data: pivotArray,
-      currency: user.nativeCurrency || "RON",
+      currency: profile.nativeCurrency || "RON",
     });
   } catch (error) {
     console.error("Pivot report error:", error);

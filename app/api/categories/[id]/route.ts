@@ -6,9 +6,29 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
 
 /**
  * DELETE /api/categories/[id]
@@ -18,7 +38,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -29,12 +49,17 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificăm că categoria există (shared mode)
-    const categories = await db
-      .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.id, id));
+    const { data: category, error: getCategoryError } = await supabase
+      .from("categories")
+      .select("id, is_system_category")
+      .eq("id", id)
+      .maybeSingle();
 
-    if (categories.length === 0) {
+    if (getCategoryError) {
+      throw new Error(getCategoryError.message);
+    }
+
+    if (!category) {
       return NextResponse.json(
         { error: "Categoria nu există" },
         { status: 404 }
@@ -42,7 +67,7 @@ export async function DELETE(
     }
 
     // PROTECȚIE: Nu permitem ștergerea categoriilor predefinite
-    if (categories[0].isSystemCategory) {
+    if (category.is_system_category) {
       return NextResponse.json(
         { error: "Nu poți șterge categoriile predefinite. Le poți doar customiza (nume, culoare, icon)." },
         { status: 403 } // 403 = Forbidden
@@ -50,9 +75,14 @@ export async function DELETE(
     }
 
     // Ștergem categoria (doar dacă e custom)
-    await db
-      .delete(schema.categories)
-      .where(eq(schema.categories.id, id));
+    const { error: deleteError } = await supabase
+      .from("categories")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
 
     return NextResponse.json({ message: "Categorie ștearsă cu succes" });
   } catch (error) {

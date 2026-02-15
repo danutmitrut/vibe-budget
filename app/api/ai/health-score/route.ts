@@ -5,36 +5,139 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { db, schema } from "@/lib/db";
-import { eq, and, gte } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+import { calculateHealthScore } from "@/lib/ai/claude";
+import { isBalanceSnapshotDescription } from "@/lib/transactions/balance-snapshot";
+
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
+
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const fallbackName =
+    (user.user_metadata?.name as string | undefined) ||
+    user.email?.split("@")[0] ||
+    "Utilizator";
+  const fallbackCurrency =
+    (user.user_metadata?.native_currency as string | undefined) || "RON";
+
+  let effectiveUserId = user.id;
+
+  const { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email || `${user.id}@placeholder.local`,
+        name: fallbackName,
+        native_currency: fallbackCurrency,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertUserError) {
+    if (upsertUserError.message.includes("users_email_key") && user.email) {
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id, native_currency")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (existingUserError || !existingUser) {
+        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
+      }
+
+      effectiveUserId = existingUser.id;
+      return {
+        id: effectiveUserId,
+        nativeCurrency: existingUser.native_currency || fallbackCurrency,
+      };
+    }
+
+    throw new Error(upsertUserError.message);
+  }
+
+  const { data: profile } = await supabase
+    .from("users")
+    .select("native_currency")
+    .eq("id", effectiveUserId)
+    .maybeSingle();
+
+  return {
+    id: effectiveUserId,
+    nativeCurrency: profile?.native_currency || fallbackCurrency,
+  };
+}
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+    const profile = await ensureUserProfile(supabase, user);
 
     // Obținem tranzacțiile din ultimele 90 de zile
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setDate(threeMonthsAgo.getDate() - 90);
     const dateThreshold = threeMonthsAgo.toISOString().split('T')[0];
 
-    // SHARED MODE: Toate tranzacțiile din ultimele 90 zile
-    const transactions = await db
-      .select()
-      .from(schema.transactions)
-      .where(gte(schema.transactions.date, dateThreshold));
+    const { data: transactionsData, error: transactionsError } = await supabase
+      .from("transactions")
+      .select("amount, category_id, description")
+      .gte("date", dateThreshold);
 
-    if (transactions.length === 0) {
+    if (transactionsError) {
+      throw new Error(transactionsError.message);
+    }
+
+    const transactions = (transactionsData || []).filter(
+      (transaction) => !isBalanceSnapshotDescription(transaction.description)
+    );
+
+    if (transactions.length < 10) {
       return NextResponse.json({
         score: 0,
         grade: "N/A",
         message: "Insufficient data",
+        breakdown: {
+          cashFlow: 0,
+          diversification: 0,
+          savingsRate: 0,
+        },
+        strengths: [],
+        weaknesses: ["Date insuficiente pentru analiză AI"],
+        recommendations: ["Importă cel puțin 10 tranzacții reale"],
+        metrics: {
+          monthlyIncome: 0,
+          monthlyExpenses: 0,
+          balance: 0,
+          savingsRate: 0,
+        },
       });
     }
 
@@ -42,59 +145,68 @@ export async function GET(request: NextRequest) {
     let totalIncome = 0;
     let totalExpenses = 0;
     let categorizedCount = 0;
+    const expensesByCategory: Record<string, number> = {};
 
     for (const t of transactions) {
-      if (t.amount > 0) {
-        totalIncome += t.amount;
-      } else {
-        totalExpenses += Math.abs(t.amount);
+      const amount = Number(t.amount);
+      if (!Number.isFinite(amount)) {
+        continue;
       }
-      if (t.categoryId) {
+
+      if (amount > 0) {
+        totalIncome += amount;
+      } else {
+        totalExpenses += Math.abs(amount);
+      }
+
+      if (t.category_id) {
         categorizedCount++;
+        if (amount < 0) {
+          expensesByCategory[t.category_id] = (expensesByCategory[t.category_id] || 0) + Math.abs(amount);
+        }
       }
     }
 
-    // Metrici pentru scor
-    const categorizationRate = categorizedCount / transactions.length;
-    const savingsRate = totalIncome > 0 ? (totalIncome - totalExpenses) / totalIncome : 0;
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from("categories")
+      .select("id, name");
 
-    // Calculăm scorul (0-10)
-    let score = 5; // Bază
+    if (categoriesError) {
+      throw new Error(categoriesError.message);
+    }
 
-    // +2 puncte pentru rate de categorizare bună (>80%)
-    if (categorizationRate > 0.8) score += 2;
-    else if (categorizationRate > 0.5) score += 1;
+    const categoryNameById = new Map((categoriesData || []).map((category) => [category.id, category.name]));
 
-    // +3 puncte pentru savings rate pozitiv
-    if (savingsRate > 0.2) score += 3;
-    else if (savingsRate > 0.1) score += 2;
-    else if (savingsRate > 0) score += 1;
-    else if (savingsRate < -0.2) score -= 2;
+    const categories = Object.entries(expensesByCategory).map(([categoryId, amount]) => ({
+      name: categoryNameById.get(categoryId) || "Necategorizat",
+      amount: Math.round(amount),
+      percentage: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0,
+    }));
 
-    // Normalizăm la 0-10
-    score = Math.max(0, Math.min(10, score));
+    const monthlyIncome = totalIncome / 3;
+    const monthlyExpenses = totalExpenses / 3;
+    const savingsRate = monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
 
-    // Determinăm grade-ul
-    let grade = "F";
-    if (score >= 9) grade = "A+";
-    else if (score >= 8.5) grade = "A";
-    else if (score >= 8) grade = "A-";
-    else if (score >= 7.5) grade = "B+";
-    else if (score >= 7) grade = "B";
-    else if (score >= 6.5) grade = "B-";
-    else if (score >= 6) grade = "C+";
-    else if (score >= 5.5) grade = "C";
-    else if (score >= 5) grade = "C-";
-    else if (score >= 4) grade = "D";
+    const healthScore = await calculateHealthScore({
+      monthlyIncome: Math.round(monthlyIncome),
+      monthlyExpenses: Math.round(monthlyExpenses),
+      categories,
+      currency: profile.nativeCurrency || "RON",
+    });
 
     return NextResponse.json({
-      score: Math.round(score * 10) / 10,
-      grade,
+      score: healthScore.score,
+      grade: healthScore.grade,
+      breakdown: healthScore.breakdown,
+      strengths: healthScore.strengths,
+      weaknesses: healthScore.weaknesses,
+      recommendations: healthScore.recommendations,
       metrics: {
-        totalIncome,
-        totalExpenses,
-        savingsRate: Math.round(savingsRate * 100),
-        categorizationRate: Math.round(categorizationRate * 100),
+        monthlyIncome: Math.round(monthlyIncome),
+        monthlyExpenses: Math.round(monthlyExpenses),
+        balance: Math.round(monthlyIncome - monthlyExpenses),
+        savingsRate: Number(savingsRate.toFixed(1)),
+        categorizationRate: Number(((categorizedCount / transactions.length) * 100).toFixed(1)),
         transactionCount: transactions.length,
       },
     });

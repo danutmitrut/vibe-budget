@@ -16,6 +16,14 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  const pathname = request.nextUrl.pathname;
+
+  // Middleware rulează doar pe dashboard (vezi matcher),
+  // deci evităm orice apel inutil către Supabase.
+  if (!pathname.startsWith('/dashboard')) {
+    return NextResponse.next({ request });
+  }
+
   let supabaseResponse = NextResponse.next({
     request,
   });
@@ -41,28 +49,25 @@ export async function middleware(request: NextRequest) {
     }
   );
 
-  // Refresh session dacă există
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Refresh session dacă există, cu timeout defensiv pentru Edge runtime.
+  let user: { id: string } | null = null;
 
-  // Protejează rute care necesită autentificare
-  const protectedPaths = ['/dashboard', '/transactions', '/categories', '/banks'];
-  const isProtectedPath = protectedPaths.some((path) =>
-    request.nextUrl.pathname.startsWith(path)
-  );
-
-  if (isProtectedPath && !user) {
-    // User ne-autentificat încearcă să acceseze o rută protejată
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
-    return NextResponse.redirect(url);
+  try {
+    const authResult = await Promise.race([
+      supabase.auth.getUser(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('Supabase auth timeout in middleware')), 3000)
+      ),
+    ]);
+    user = authResult.data.user;
+  } catch {
+    user = null;
   }
 
-  // User autentificat încearcă să acceseze /login sau /register
-  if (user && (request.nextUrl.pathname === '/login' || request.nextUrl.pathname === '/register')) {
+  if (!user) {
+    // User ne-autentificat încearcă să acceseze dashboard.
     const url = request.nextUrl.clone();
-    url.pathname = '/dashboard';
+    url.pathname = '/login';
     return NextResponse.redirect(url);
   }
 
@@ -71,13 +76,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match toate rutele EXCEPT:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (*.svg, *.png, etc.)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/dashboard/:path*',
   ],
 };

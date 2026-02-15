@@ -13,6 +13,7 @@
 
 import Papa from "papaparse";
 import * as XLSX from "xlsx";
+import { isBalanceSnapshotDescription } from "@/lib/transactions/balance-snapshot";
 
 /**
  * Tipul pentru o tranzacție parsată
@@ -89,6 +90,10 @@ export async function parseCSV(file: File): Promise<ParseResult> {
               const currency = detectCurrency(row);
 
               if (date && description && amount !== null) {
+                if (isBalanceSnapshotDescription(description)) {
+                  return;
+                }
+
                 transactions.push({
                   date: formatDate(date),
                   description: description.trim(),
@@ -193,6 +198,10 @@ export async function parseExcel(file: File): Promise<ParseResult> {
             }
 
             if (date && description && amount !== null) {
+              if (isBalanceSnapshotDescription(description)) {
+                return;
+              }
+
               transactions.push({
                 date: formatDate(date),
                 description: description.trim(),

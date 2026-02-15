@@ -11,16 +11,36 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and, inArray } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
+
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
 
 /**
  * POST /api/transactions/bulk-delete
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -39,27 +59,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SHARED MODE: Verificăm doar că tranzacțiile există
-    const existingTransactions = await db
-      .select()
-      .from(schema.transactions)
-      .where(inArray(schema.transactions.id, transactionIds));
+    const sanitizedTransactionIds = Array.from(
+      new Set(transactionIds.filter((id): id is string => typeof id === "string" && id.length > 0))
+    );
 
-    if (existingTransactions.length !== transactionIds.length) {
+    if (sanitizedTransactionIds.length === 0) {
       return NextResponse.json(
-        { error: "Unele tranzacții nu există" },
-        { status: 403 }
+        { error: "ID-uri de tranzacții invalide" },
+        { status: 400 }
+      );
+    }
+
+    // SHARED MODE: Verificăm doar că tranzacțiile există
+    const { data: existingTransactions, error: existingError } = await supabase
+      .from("transactions")
+      .select("id")
+      .in("id", sanitizedTransactionIds);
+
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+
+    if ((existingTransactions || []).length !== sanitizedTransactionIds.length) {
+      return NextResponse.json(
+        { error: "Unele tranzacții nu există sau au fost deja șterse" },
+        { status: 404 }
       );
     }
 
     // Ștergem tranzacțiile
-    await db
-      .delete(schema.transactions)
-      .where(inArray(schema.transactions.id, transactionIds));
+    const { error: deleteError } = await supabase
+      .from("transactions")
+      .delete()
+      .in("id", sanitizedTransactionIds);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
 
     return NextResponse.json({
-      message: `${transactionIds.length} tranzacții șterse cu succes`,
-      deletedCount: transactionIds.length,
+      message: `${sanitizedTransactionIds.length} tranzacții șterse cu succes`,
+      deletedCount: sanitizedTransactionIds.length,
     });
   } catch (error) {
     console.error("Bulk delete error:", error);

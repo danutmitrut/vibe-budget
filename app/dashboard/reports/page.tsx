@@ -14,6 +14,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import {
   PieChart,
   Pie,
@@ -76,6 +77,7 @@ interface BudgetRecommendation {
 
 export default function ReportsPage() {
   const router = useRouter();
+  const supabase = createClient();
 
   // STATE pentru datele raportului
   const [stats, setStats] = useState<StatsResponse | null>(null);
@@ -100,12 +102,32 @@ export default function ReportsPage() {
     fetchRecommendations();
   }, [period]); // Re-fetch când se schimbă perioada
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   /**
    * FUNCȚIE: Fetch statistics from API
    */
   const fetchStats = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       setLoading(true);
 
@@ -118,11 +140,13 @@ export default function ReportsPage() {
       }
 
       const response = await fetch(url, {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) {
-        throw new Error("Eroare la încărcarea statisticilor");
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la încărcarea statisticilor");
       }
 
       const data = await response.json();
@@ -139,11 +163,11 @@ export default function ReportsPage() {
    */
   const fetchRecommendations = async () => {
     try {
-      const token = localStorage.getItem("token");
-      if (!token) return;
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch("/api/ai/budget-recommendations", {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (response.ok) {

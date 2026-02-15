@@ -22,12 +22,14 @@ export default function RegisterPage() {
     nativeCurrency: "RON",
   });
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
     setLoading(true);
 
     try {
@@ -44,6 +46,15 @@ export default function RegisterPage() {
       });
 
       if (signUpError) {
+        // Dacă utilizatorul există deja, încercăm resend pentru emailul de confirmare.
+        if (signUpError.message.toLowerCase().includes("already")) {
+          await supabase.auth.resend({
+            type: "signup",
+            email: formData.email,
+          });
+          setSuccess("Contul există deja. Am retrimis emailul de confirmare.");
+          return;
+        }
         throw new Error(signUpError.message);
       }
 
@@ -51,7 +62,14 @@ export default function RegisterPage() {
         throw new Error("Nu s-a putut crea utilizatorul");
       }
 
-      // Pas 2: Salvează datele custom în tabela users (upsert pentru a evita duplicate)
+      // Dacă nu există sesiune, email confirmation este activă.
+      // Nu încercăm INSERT în public.users înainte de confirmare (RLS îl poate bloca).
+      if (!authData.session) {
+        setSuccess("Cont creat. Verifică emailul pentru confirmare înainte de autentificare.");
+        return;
+      }
+
+      // Pas 2: Salvează datele custom în tabela users.
       const { error: insertError } = await supabase
         .from("users")
         .upsert({
@@ -64,14 +82,35 @@ export default function RegisterPage() {
         });
 
       if (insertError) {
-        throw new Error(insertError.message);
+        // În cazul în care emailul există deja în public.users, actualizăm datele profilului.
+        if (insertError.message.includes('users_email_key')) {
+          const { error: updateError } = await supabase
+            .from("users")
+            .update({
+              name: formData.name,
+              native_currency: formData.nativeCurrency,
+              updated_at: new Date().toISOString(),
+            })
+            .eq("email", formData.email);
+
+          if (updateError) {
+            throw new Error(updateError.message);
+          }
+        } else {
+          throw new Error(insertError.message);
+        }
       }
 
-      // Succes - redirect la dashboard
+      // Succes cu sesiune activă - redirect la dashboard
       router.push("/dashboard");
       router.refresh();
     } catch (err: any) {
-      setError(err.message || "Eroare la înregistrare");
+      const message = err?.message || "Eroare la înregistrare";
+      if (message.toLowerCase().includes("already registered")) {
+        setSuccess("Emailul este deja înregistrat. Verifică inbox-ul pentru confirmare.");
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -181,6 +220,13 @@ export default function RegisterPage() {
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
               {error}
+            </div>
+          )}
+
+          {/* Mesaj succes */}
+          {success && (
+            <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg">
+              {success}
             </div>
           )}
 

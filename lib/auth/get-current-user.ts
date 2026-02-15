@@ -49,32 +49,112 @@ export async function getCurrentUser(request: NextRequest) {
       }
     );
 
-    // PASUL 2: Verificăm sesiunea Supabase
-    const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+    // PASUL 2: Verificăm sesiunea Supabase.
+    // Preferăm Bearer token dacă este trimis explicit de client.
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+
+    let authUser = null;
+    let authError = null;
+
+    if (bearerToken) {
+      const bearerResult = await supabase.auth.getUser(bearerToken);
+      authUser = bearerResult.data.user;
+      authError = bearerResult.error;
+    }
+
+    // Fallback la sesiunea din cookies dacă Bearer lipsește sau e invalid.
+    if (!authUser) {
+      const cookieResult = await supabase.auth.getUser();
+      authUser = cookieResult.data.user;
+      authError = cookieResult.error;
+    }
 
     if (authError || !authUser) {
       return null; // Nu există sesiune validă
     }
 
-    // PASUL 3: Căutăm utilizatorul în tabela public.users
+    // PASUL 3: Căutăm utilizatorul în tabela public.users după ID (flux normal)
     const users = await db
       .select()
       .from(schema.users)
       .where(eq(schema.users.id, authUser.id))
       .limit(1);
 
-    if (users.length === 0) {
-      return null; // Utilizatorul nu există în public.users
+    if (users.length > 0) {
+      const user = users[0];
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        nativeCurrency: user.nativeCurrency,
+      };
     }
 
-    // PASUL 4: Returnăm utilizatorul
-    const user = users[0];
-    return {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      nativeCurrency: user.nativeCurrency,
-    };
+    // FALLBACK 1: Migrare/legacy - căutăm după email (poate exista user cu alt ID)
+    if (authUser.email) {
+      const emailUsers = await db
+        .select()
+        .from(schema.users)
+        .where(eq(schema.users.email, authUser.email))
+        .limit(1);
+
+      if (emailUsers.length > 0) {
+        const user = emailUsers[0];
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          nativeCurrency: user.nativeCurrency,
+        };
+      }
+    }
+
+    // FALLBACK 2: Dacă nu există deloc profil în public.users, îl creăm.
+    try {
+      const inserted = await db
+        .insert(schema.users)
+        .values({
+          id: authUser.id,
+          email: authUser.email || `${authUser.id}@placeholder.local`,
+          name: (authUser.user_metadata?.name as string | undefined) || "Utilizator",
+          nativeCurrency: (authUser.user_metadata?.native_currency as string | undefined) || "RON",
+        })
+        .returning();
+
+      if (inserted.length > 0) {
+        const user = inserted[0];
+        return {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          nativeCurrency: user.nativeCurrency,
+        };
+      }
+    } catch {
+      // Dacă insert-ul eșuează (ex: concurență / duplicate), încercăm încă o citire după email.
+      if (authUser.email) {
+        const retryUsers = await db
+          .select()
+          .from(schema.users)
+          .where(eq(schema.users.email, authUser.email))
+          .limit(1);
+
+        if (retryUsers.length > 0) {
+          const user = retryUsers[0];
+          return {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            nativeCurrency: user.nativeCurrency,
+          };
+        }
+      }
+    }
+
+    return null;
   } catch (error) {
     console.error("Get current user error:", error);
     return null;

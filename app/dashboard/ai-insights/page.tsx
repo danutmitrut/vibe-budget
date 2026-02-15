@@ -13,6 +13,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 // Interfețe pentru răspunsuri API
 interface HealthScore {
@@ -53,6 +54,7 @@ interface Anomaly {
 
 export default function AIInsightsPage() {
   const router = useRouter();
+  const supabase = createClient();
 
   const [healthScore, setHealthScore] = useState<HealthScore | null>(null);
   const [recommendations, setRecommendations] = useState<BudgetRecommendation[]>([]);
@@ -65,24 +67,60 @@ export default function AIInsightsPage() {
     fetchAllInsights();
   }, []);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   const fetchAllInsights = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       setLoading(true);
 
       // Fetch toate cele 3 insights în paralel
       const [healthRes, recsRes, anomRes] = await Promise.all([
         fetch("/api/ai/health-score", {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
         fetch("/api/ai/budget-recommendations", {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
         fetch("/api/ai/anomaly-detection", {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
       ]);
+
+      if (!healthRes.ok && !recsRes.ok && !anomRes.ok) {
+        const healthError = await healthRes.json().catch(() => null);
+        const recsError = await recsRes.json().catch(() => null);
+        const anomError = await anomRes.json().catch(() => null);
+
+        const message =
+          healthError?.error ||
+          recsError?.error ||
+          anomError?.error ||
+          "Eroare la încărcarea AI Insights";
+        throw new Error(message);
+      }
 
       if (healthRes.ok) {
         const healthData = await healthRes.json();

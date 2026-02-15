@@ -14,11 +14,78 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and, isNull } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { autoCategorizeByCategoryName } from "@/lib/auto-categorization/categories-rules";
-import { matchUserKeyword } from "@/lib/auto-categorization/user-keywords-matcher";
+import { ensureDefaultSystemCategories } from "@/lib/categories/default-system-categories";
+import { isBalanceSnapshotDescription } from "@/lib/transactions/balance-snapshot";
+
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
+
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const fallbackName =
+    (user.user_metadata?.name as string | undefined) ||
+    user.email?.split("@")[0] ||
+    "Utilizator";
+  const fallbackCurrency =
+    (user.user_metadata?.native_currency as string | undefined) || "RON";
+
+  let effectiveUserId = user.id;
+
+  const { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email || `${user.id}@placeholder.local`,
+        name: fallbackName,
+        native_currency: fallbackCurrency,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertUserError) {
+    if (upsertUserError.message.includes("users_email_key") && user.email) {
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (existingUserError || !existingUser) {
+        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
+      }
+
+      effectiveUserId = existingUser.id;
+    } else {
+      throw new Error(upsertUserError.message);
+    }
+  }
+
+  return { id: effectiveUserId };
+}
 
 /**
  * POST /api/transactions/recategorize
@@ -35,7 +102,7 @@ import { matchUserKeyword } from "@/lib/auto-categorization/user-keywords-matche
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -43,15 +110,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const profile = await ensureUserProfile(supabase, user);
+    await ensureDefaultSystemCategories(supabase, profile.id);
+
     // PASUL 1: SHARED MODE - Obținem toate tranzacțiile NECATEGORIZATE
-    const uncategorizedTransactions = await db
-      .select()
-      .from(schema.transactions)
-      .where(isNull(schema.transactions.categoryId));
+    const { data: uncategorizedTransactions, error: transactionsError } = await supabase
+      .from("transactions")
+      .select("id, description")
+      .is("category_id", null);
 
-    console.log(`🔄 Re-categorizare: ${uncategorizedTransactions.length} tranzacții necategorizate găsite pentru ${user.email}`);
+    if (transactionsError) {
+      throw new Error(transactionsError.message);
+    }
 
-    if (uncategorizedTransactions.length === 0) {
+    const pendingTransactions = (uncategorizedTransactions || []).filter(
+      (transaction) => !isBalanceSnapshotDescription(transaction.description)
+    );
+    console.log(`🔄 Re-categorizare: ${pendingTransactions.length} tranzacții necategorizate găsite pentru ${user.email}`);
+
+    if (pendingTransactions.length === 0) {
       return NextResponse.json({
         message: "Nu există tranzacții necategorizate",
         total: 0,
@@ -61,18 +138,35 @@ export async function POST(request: NextRequest) {
     }
 
     // PASUL 2: SHARED MODE - Obținem toate categoriile
-    const userCategories = await db
-      .select()
-      .from(schema.categories);
+    const { data: userCategories, error: categoriesError } = await supabase
+      .from("categories")
+      .select("id, name, icon");
 
-    console.log(`📋 Utilizatorul ${user.email} are ${userCategories.length} categorii`);
+    if (categoriesError) {
+      throw new Error(categoriesError.message);
+    }
+
+    const categories = userCategories || [];
+
+    const { data: userKeywords, error: keywordsError } = await supabase
+      .from("user_keywords")
+      .select("keyword, category_id")
+      .eq("user_id", profile.id);
+
+    if (keywordsError) {
+      throw new Error(keywordsError.message);
+    }
+
+    const keywords = userKeywords || [];
+
+    console.log(`📋 Utilizatorul ${user.email} are ${categories.length} categorii`);
 
     // PASUL 3: Re-categorizăm fiecare tranzacție
     // IMPORTANT: Verificăm mai întâi keyword-uri personalizate, apoi reguli globale
     let recategorizedCount = 0;
     let unchangedCount = 0;
 
-    for (const transaction of uncategorizedTransactions) {
+    for (const transaction of pendingTransactions) {
       const description = transaction.description || "";
 
       if (!description) {
@@ -83,7 +177,14 @@ export async function POST(request: NextRequest) {
       let categoryIdToAssign: string | null = null;
 
       // PRIORITATE 1: Verificăm keyword-uri personalizate ale utilizatorului
-      categoryIdToAssign = await matchUserKeyword(user.id, description);
+      const lowerDescription = description.toLowerCase();
+      const keywordMatch = keywords.find((keyword) =>
+        lowerDescription.includes(keyword.keyword.toLowerCase())
+      );
+
+      if (keywordMatch) {
+        categoryIdToAssign = keywordMatch.category_id;
+      }
 
       // PRIORITATE 2: Dacă nu am găsit keyword personalizat, folosim regulile globale
       if (!categoryIdToAssign) {
@@ -91,7 +192,7 @@ export async function POST(request: NextRequest) {
 
         if (suggestedCategoryName) {
           // Găsim categoria în baza de date pentru acest user
-          const categoryMatch = userCategories.find(
+          const categoryMatch = categories.find(
             (c) => c.name === suggestedCategoryName
           );
 
@@ -110,22 +211,26 @@ export async function POST(request: NextRequest) {
       }
 
       // UPDATE: Actualizăm categoria
-      await db
-        .update(schema.transactions)
-        .set({ categoryId: categoryIdToAssign })
-        .where(eq(schema.transactions.id, transaction.id));
+      const { error: updateError } = await supabase
+        .from("transactions")
+        .update({ category_id: categoryIdToAssign })
+        .eq("id", transaction.id);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
 
       // Găsim categoria pentru log
-      const assignedCategory = userCategories.find((c) => c.id === categoryIdToAssign);
+      const assignedCategory = categories.find((c) => c.id === categoryIdToAssign);
       console.log(`✅ "${description.substring(0, 40)}" → ${assignedCategory?.icon} ${assignedCategory?.name}`);
       recategorizedCount++;
     }
 
-    console.log(`✅ Re-categorizare finalizată: ${recategorizedCount}/${uncategorizedTransactions.length} tranzacții categorizate`);
+    console.log(`✅ Re-categorizare finalizată: ${recategorizedCount}/${pendingTransactions.length} tranzacții categorizate`);
 
     return NextResponse.json({
       message: "Re-categorizare finalizată cu succes",
-      total: uncategorizedTransactions.length,
+      total: pendingTransactions.length,
       recategorized: recategorizedCount,
       unchanged: unchangedCount,
     });

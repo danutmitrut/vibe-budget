@@ -42,6 +42,13 @@ export default function DashboardPage() {
   const [showAnomalies, setShowAnomalies] = useState(false);
   const supabase = createClient();
 
+  const normalizeUser = (userData: any): User => ({
+    id: userData.id,
+    email: userData.email,
+    name: userData.name,
+    nativeCurrency: userData.native_currency,
+  });
+
   // PASUL 1: Verificăm dacă user e autentificat cu Supabase
   useEffect(() => {
     const checkAuth = async () => {
@@ -59,18 +66,52 @@ export default function DashboardPage() {
           .from("users")
           .select("*")
           .eq("id", authUser.id)
-          .single();
+          .maybeSingle();
 
-        if (userError || !userData) {
+        if (userError) {
           throw new Error("Nu s-au putut încărca datele utilizatorului");
         }
 
-        setUser({
-          id: userData.id,
-          email: userData.email,
-          name: userData.name,
-          nativeCurrency: userData.native_currency,
-        });
+        if (userData) {
+          setUser(normalizeUser(userData));
+          fetchAIInsights();
+          return;
+        }
+
+        // Fallback 1: Dacă profilul pe ID lipsește, încercăm după email.
+        const { data: emailUser, error: emailUserError } = await supabase
+          .from("users")
+          .select("*")
+          .eq("email", authUser.email || "")
+          .maybeSingle();
+
+        if (emailUserError) {
+          throw new Error("Nu s-au putut încărca datele utilizatorului");
+        }
+
+        if (emailUser) {
+          setUser(normalizeUser(emailUser));
+          fetchAIInsights();
+          return;
+        }
+
+        // Fallback 2: Creăm profil minim dacă nu există deloc în public.users.
+        const { data: createdUser, error: createUserError } = await supabase
+          .from("users")
+          .insert({
+            id: authUser.id,
+            email: authUser.email || "",
+            name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "Utilizator",
+            native_currency: authUser.user_metadata?.native_currency || "RON",
+          })
+          .select("*")
+          .single();
+
+        if (createUserError || !createdUser) {
+          throw new Error("Nu s-a putut crea profilul utilizatorului");
+        }
+
+        setUser(normalizeUser(createdUser));
 
         // Fetch AI insights în background (non-blocking)
         fetchAIInsights();
@@ -114,6 +155,7 @@ export default function DashboardPage() {
   // PASUL 2: Funcția de logout cu Supabase
   const handleLogout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem("token");
     router.push("/login");
   };
 

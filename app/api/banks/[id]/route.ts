@@ -7,9 +7,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * DELETE /api/banks/[id]
@@ -21,8 +19,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    // Verificăm autentificarea
-    const user = await getCurrentUser(request);
+    const supabase = await createClient();
+    const authHeader = request.headers.get("authorization");
+    const bearerToken = authHeader?.startsWith("Bearer ")
+      ? authHeader.slice(7).trim()
+      : null;
+
+    const authResult = bearerToken && bearerToken !== "null" && bearerToken !== "undefined"
+      ? await supabase.auth.getUser(bearerToken)
+      : await supabase.auth.getUser();
+
+    const user = authResult.data.user;
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -33,12 +40,17 @@ export async function DELETE(
     const { id } = await params;
 
     // Verificăm că banca există (fără verificare ownership)
-    const banks = await db
-      .select()
-      .from(schema.banks)
-      .where(eq(schema.banks.id, id));
+    const { data: bank, error: getBankError } = await supabase
+      .from("banks")
+      .select("id")
+      .eq("id", id)
+      .maybeSingle();
 
-    if (banks.length === 0) {
+    if (getBankError) {
+      throw new Error(getBankError.message);
+    }
+
+    if (!bank) {
       return NextResponse.json(
         { error: "Banca nu există" },
         { status: 404 }
@@ -46,9 +58,14 @@ export async function DELETE(
     }
 
     // Ștergem banca
-    await db
-      .delete(schema.banks)
-      .where(eq(schema.banks.id, id));
+    const { error: deleteError } = await supabase
+      .from("banks")
+      .delete()
+      .eq("id", id);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
 
     return NextResponse.json({ message: "Bancă ștearsă cu succes" });
   } catch (error) {

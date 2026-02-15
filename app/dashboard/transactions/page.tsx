@@ -12,6 +12,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
+import { createClient } from "@/lib/supabase/client";
 
 interface Transaction {
   id: string;
@@ -39,6 +40,7 @@ interface Category {
 
 export default function TransactionsPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [banks, setBanks] = useState<Bank[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -73,32 +75,79 @@ export default function TransactionsPage() {
     fetchData();
   }, [selectedBankId]);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const headers: Record<string, string> = {};
+    if (sessionToken) {
+      headers.Authorization = `Bearer ${sessionToken}`;
+    }
+    return headers;
+  };
+
   const fetchData = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       // Fetch paralel pentru toate datele
       const [transactionsRes, banksRes, categoriesRes] = await Promise.all([
         fetch(`/api/transactions?limit=200${selectedBankId ? `&bankId=${selectedBankId}` : ""}`, {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
         fetch("/api/banks", {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
         fetch("/api/categories", {
-          
+          headers: authHeaders,
+          credentials: "include",
         }),
       ]);
 
       if (!transactionsRes.ok || !banksRes.ok || !categoriesRes.ok) {
-        throw new Error("Eroare la încărcarea datelor");
+        const [transactionsErr, banksErr, categoriesErr] = await Promise.all([
+          transactionsRes.ok ? Promise.resolve("") : transactionsRes.text(),
+          banksRes.ok ? Promise.resolve("") : banksRes.text(),
+          categoriesRes.ok ? Promise.resolve("") : categoriesRes.text(),
+        ]);
+
+        throw new Error(
+          [
+            transactionsErr && `transactions: ${transactionsErr}`,
+            banksErr && `banks: ${banksErr}`,
+            categoriesErr && `categories: ${categoriesErr}`,
+          ]
+            .filter(Boolean)
+            .join(" | ") || "Eroare la încărcarea datelor"
+        );
       }
 
       const transactionsData = await transactionsRes.json();
       const banksData = await banksRes.json();
       const categoriesData = await categoriesRes.json();
 
-      setTransactions(transactionsData.transactions);
+      const normalizedTransactions = (transactionsData.transactions || []).map((transaction: any) => ({
+        id: transaction.id,
+        bankId: transaction.bankId ?? transaction.bank_id ?? null,
+        categoryId: transaction.categoryId ?? transaction.category_id ?? null,
+        date: transaction.date,
+        description: transaction.description,
+        amount: Number(transaction.amount),
+        currency: transaction.currency,
+      }));
+
+      setTransactions(normalizedTransactions);
       setBanks(banksData.banks);
       setCategories(categoriesData.categories);
     } catch (err: any) {
@@ -122,13 +171,14 @@ export default function TransactionsPage() {
 
   const handleCategorize = async (transactionId: string, categoryId: string, skipKeywordPrompt: boolean = false) => {
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`/api/transactions/${transactionId}`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({ categoryId }),
       });
 
@@ -223,13 +273,14 @@ export default function TransactionsPage() {
    */
   const handleSaveKeyword = async (keyword: string, categoryId: string) => {
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/user-keywords", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({ keyword, categoryId }),
       });
 
@@ -256,13 +307,14 @@ export default function TransactionsPage() {
 
     setIsCreatingCategory(true);
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/categories", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({
           name: newCategoryName,
           type: newCategoryType,
@@ -303,10 +355,11 @@ export default function TransactionsPage() {
     if (!confirm("Sigur vrei să ștergi această tranzacție?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`/api/transactions/${transactionId}`, {
         method: "DELETE",
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Eroare la ștergere");
@@ -326,13 +379,14 @@ export default function TransactionsPage() {
     setRecategorizeMessage("");
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/transactions/recategorize", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({}),
       });
 
@@ -388,19 +442,23 @@ export default function TransactionsPage() {
 
     setIsDeleting(true);
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/transactions/bulk-delete", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({
           transactionIds: Array.from(selectedIds),
         }),
       });
 
-      if (!response.ok) throw new Error("Eroare la ștergerea multiplă");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la ștergerea multiplă");
+      }
 
       const data = await response.json();
       alert(data.message);

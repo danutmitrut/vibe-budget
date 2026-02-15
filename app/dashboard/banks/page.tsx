@@ -13,6 +13,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface Bank {
   id: string;
@@ -23,6 +24,7 @@ interface Bank {
 
 export default function BanksPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [banks, setBanks] = useState<Bank[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -34,15 +36,42 @@ export default function BanksPage() {
     fetchBanks();
   }, []);
 
+  const getAuthHeaders = async () => {
+    const { data } = await supabase.auth.getSession();
+    const sessionToken = data.session?.access_token;
+    const storedToken = localStorage.getItem("token");
+
+    if (sessionToken && sessionToken !== storedToken) {
+      localStorage.setItem("token", sessionToken);
+    }
+
+    // Evităm trimiterea unui token stale din localStorage.
+    if (!sessionToken && storedToken) {
+      localStorage.removeItem("token");
+    }
+
+    const token = sessionToken;
+
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    return headers;
+  };
+
   const fetchBanks = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders();
 
       const response = await fetch("/api/banks", {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Eroare la încărcarea băncilor");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la încărcarea băncilor");
+      }
 
       const data = await response.json();
       setBanks(data.banks);
@@ -60,13 +89,14 @@ export default function BanksPage() {
     setAdding(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch("/api/banks", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify(newBank),
       });
 
@@ -90,13 +120,17 @@ export default function BanksPage() {
     if (!confirm("Sigur vrei să ștergi această bancă?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders();
       const response = await fetch(`/api/banks/${id}`, {
         method: "DELETE",
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
-      if (!response.ok) throw new Error("Eroare la ștergerea băncii");
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || "Eroare la ștergerea băncii");
+      }
 
       await fetchBanks();
     } catch (err: any) {

@@ -11,10 +11,76 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq, and } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 import { createId } from "@paralleldrive/cuid2";
+
+async function getAuthUser(request: NextRequest) {
+  const supabase = await createClient();
+  const authHeader = request.headers.get("authorization");
+  const bearerToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.slice(7).trim()
+    : null;
+
+  let user = null;
+
+  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
+    const bearerResult = await supabase.auth.getUser(bearerToken);
+    user = bearerResult.data.user;
+  }
+
+  if (!user) {
+    const cookieResult = await supabase.auth.getUser();
+    user = cookieResult.data.user;
+  }
+
+  return { supabase, user };
+}
+
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const fallbackName =
+    (user.user_metadata?.name as string | undefined) ||
+    user.email?.split("@")[0] ||
+    "Utilizator";
+  const fallbackCurrency =
+    (user.user_metadata?.native_currency as string | undefined) || "RON";
+
+  let effectiveUserId = user.id;
+
+  const { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert(
+      {
+        id: user.id,
+        email: user.email || `${user.id}@placeholder.local`,
+        name: fallbackName,
+        native_currency: fallbackCurrency,
+      },
+      { onConflict: "id" }
+    );
+
+  if (upsertUserError) {
+    if (upsertUserError.message.includes("users_email_key") && user.email) {
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from("users")
+        .select("id")
+        .eq("email", user.email)
+        .maybeSingle();
+
+      if (existingUserError || !existingUser) {
+        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
+      }
+
+      effectiveUserId = existingUser.id;
+    } else {
+      throw new Error(upsertUserError.message);
+    }
+  }
+
+  return { id: effectiveUserId };
+}
 
 /**
  * GET /api/user-keywords
@@ -23,7 +89,7 @@ import { createId } from "@paralleldrive/cuid2";
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -31,22 +97,38 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // SHARED MODE: Toți userii văd toate keyword-urile
-    const keywords = await db
-      .select({
-        id: schema.userKeywords.id,
-        keyword: schema.userKeywords.keyword,
-        categoryId: schema.userKeywords.categoryId,
-        categoryName: schema.categories.name,
-        categoryIcon: schema.categories.icon,
-        categoryColor: schema.categories.color,
-        createdAt: schema.userKeywords.createdAt,
-      })
-      .from(schema.userKeywords)
-      .leftJoin(
-        schema.categories,
-        eq(schema.userKeywords.categoryId, schema.categories.id)
-      );
+    const { data: keywordsData, error: keywordsError } = await supabase
+      .from("user_keywords")
+      .select("id, keyword, category_id, created_at");
+
+    if (keywordsError) {
+      throw new Error(keywordsError.message);
+    }
+
+    const { data: categoriesData, error: categoriesError } = await supabase
+      .from("categories")
+      .select("id, name, icon, color");
+
+    if (categoriesError) {
+      throw new Error(categoriesError.message);
+    }
+
+    const categoryMap = new Map(
+      (categoriesData || []).map((category) => [category.id, category])
+    );
+
+    const keywords = (keywordsData || []).map((keyword) => {
+      const category = categoryMap.get(keyword.category_id);
+      return {
+        id: keyword.id,
+        keyword: keyword.keyword,
+        categoryId: keyword.category_id,
+        categoryName: category?.name || null,
+        categoryIcon: category?.icon || null,
+        categoryColor: category?.color || null,
+        createdAt: keyword.created_at,
+      };
+    });
 
     return NextResponse.json({ keywords });
   } catch (error) {
@@ -69,13 +151,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+
+    const profile = await ensureUserProfile(supabase, user);
 
     const body = await request.json();
     const { keyword, categoryId } = body;
@@ -88,45 +172,73 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SHARED MODE: Verificăm dacă keyword-ul există deja (global, nu per user)
-    const existingKeyword = await db
-      .select()
-      .from(schema.userKeywords)
-      .where(eq(schema.userKeywords.keyword, keyword.toLowerCase().trim()))
-      .limit(1);
+    const normalizedKeyword = keyword.toLowerCase().trim();
 
-    if (existingKeyword.length > 0) {
+    // SHARED MODE: Verificăm dacă keyword-ul există deja (global, nu per user)
+    const { data: existingKeyword, error: existingKeywordError } = await supabase
+      .from("user_keywords")
+      .select("id, keyword, category_id, user_id, created_at")
+      .eq("keyword", normalizedKeyword)
+      .maybeSingle();
+
+    if (existingKeywordError) {
+      throw new Error(existingKeywordError.message);
+    }
+
+    if (existingKeyword) {
       // Update categoria dacă keyword-ul există deja
-      const updated = await db
-        .update(schema.userKeywords)
-        .set({ categoryId })
-        .where(eq(schema.userKeywords.id, existingKeyword[0].id))
-        .returning();
+      const { data: updated, error: updateError } = await supabase
+        .from("user_keywords")
+        .update({ category_id: categoryId })
+        .eq("id", existingKeyword.id)
+        .select("id, keyword, category_id, user_id, created_at")
+        .single();
+
+      if (updateError || !updated) {
+        throw new Error(updateError?.message || "Nu s-a putut actualiza keyword-ul");
+      }
 
       return NextResponse.json({
         message: "Keyword actualizat cu succes",
-        keyword: updated[0],
+        keyword: {
+          id: updated.id,
+          keyword: updated.keyword,
+          categoryId: updated.category_id,
+          userId: updated.user_id,
+          createdAt: updated.created_at,
+        },
         updated: true,
       });
     }
 
     // Creăm keyword-ul nou
-    const newKeyword = await db
-      .insert(schema.userKeywords)
-      .values({
+    const { data: newKeyword, error: insertError } = await supabase
+      .from("user_keywords")
+      .insert({
         id: createId(),
-        userId: user.id,
-        keyword: keyword.toLowerCase().trim(),
-        categoryId,
+        user_id: profile.id,
+        keyword: normalizedKeyword,
+        category_id: categoryId,
       })
-      .returning();
+      .select("id, keyword, category_id, user_id, created_at")
+      .single();
 
-    console.log(`✅ Keyword salvat: "${keyword}" → categoria ${categoryId} pentru ${user.email}`);
+    if (insertError || !newKeyword) {
+      throw new Error(insertError?.message || "Nu s-a putut salva keyword-ul");
+    }
+
+    console.log(`✅ Keyword salvat: "${normalizedKeyword}" → categoria ${categoryId} pentru ${user.email}`);
 
     return NextResponse.json(
       {
         message: "Keyword salvat cu succes",
-        keyword: newKeyword[0],
+        keyword: {
+          id: newKeyword.id,
+          keyword: newKeyword.keyword,
+          categoryId: newKeyword.category_id,
+          userId: newKeyword.user_id,
+          createdAt: newKeyword.created_at,
+        },
       },
       { status: 201 }
     );
@@ -144,7 +256,7 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getAuthUser(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -163,9 +275,14 @@ export async function DELETE(request: NextRequest) {
     }
 
     // SHARED MODE: Oricine poate șterge orice keyword
-    await db
-      .delete(schema.userKeywords)
-      .where(eq(schema.userKeywords.id, keywordId));
+    const { error: deleteError } = await supabase
+      .from("user_keywords")
+      .delete()
+      .eq("id", keywordId);
+
+    if (deleteError) {
+      throw new Error(deleteError.message);
+    }
 
     return NextResponse.json({ message: "Keyword șters cu succes" });
   } catch (error) {
