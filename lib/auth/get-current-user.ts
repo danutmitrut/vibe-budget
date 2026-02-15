@@ -16,7 +16,6 @@ import { NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { db, schema } from "@/lib/db";
 import { eq } from "drizzle-orm";
-import { cookies } from "next/headers";
 
 /**
  * Extrage și returnează utilizatorul curent din sesiunea Supabase.
@@ -32,20 +31,19 @@ import { cookies } from "next/headers";
  */
 export async function getCurrentUser(request: NextRequest) {
   try {
-    // PASUL 1: Creăm Supabase server client
-    const cookieStore = await cookies();
+    // PASUL 1: Creăm Supabase server client folosind cookies DIN request
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
           getAll() {
-            return cookieStore.getAll();
+            // Citim cookies din request (nu din next/headers)
+            return request.cookies.getAll();
           },
           setAll(cookiesToSet) {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
+            // În API routes, nu putem seta cookies direct
+            // Middleware-ul se va ocupa de refresh
           },
         },
       }
