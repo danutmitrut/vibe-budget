@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthHeaders } from "@/lib/supabase/auth-headers";
 
 interface UserKeyword {
   id: string;
@@ -37,25 +38,6 @@ export default function KeywordsPage() {
     fetchKeywords();
   }, []);
 
-  const getAuthHeaders = async () => {
-    const { data } = await supabase.auth.getSession();
-    const sessionToken = data.session?.access_token;
-    const storedToken = localStorage.getItem("token");
-
-    if (sessionToken && sessionToken !== storedToken) {
-      localStorage.setItem("token", sessionToken);
-    }
-
-    if (!sessionToken && storedToken) {
-      localStorage.removeItem("token");
-    }
-
-    const headers: Record<string, string> = {};
-    if (sessionToken) {
-      headers.Authorization = `Bearer ${sessionToken}`;
-    }
-    return headers;
-  };
 
   const fetchKeywords = async () => {
     try {

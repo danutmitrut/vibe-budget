@@ -1,100 +1,97 @@
 /**
  * API ROUTE: Add Transfer Intern category to existing users
  *
- * IMPORTANT: This is a ONE-TIME migration endpoint
- * Run it once to add "Transfer Intern" category to all existing users
- *
+ * IMPORTANT: One-time migration endpoint.
  * Usage: POST /api/admin/add-transfer-intern-category
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { createId } from "@paralleldrive/cuid2";
+import { getSupabaseAuthContext } from "@/lib/supabase/auth-context";
+import { requireAdminEmail } from "@/lib/auth/admin";
 
 export async function POST(request: NextRequest) {
   try {
-    // SECURITY: Only allow authenticated users
-    // In production, you should add admin role check here
-    const currentUser = await getCurrentUser(request);
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    const { supabase, user } = await getSupabaseAuthContext(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const adminCheck = requireAdminEmail(user.email);
+    if (adminCheck) {
+      return adminCheck;
     }
 
-    console.log("🚀 Adding 'Transfer Intern' category to all users...\n");
+    const { data: users, error: usersError } = await supabase
+      .from("users")
+      .select("id, email");
 
-    // STEP 1: Get all users
-    const users = await db.select().from(schema.users);
-    console.log(`📋 Found ${users.length} users\n`);
+    if (usersError) {
+      throw new Error(usersError.message);
+    }
 
+    const allUsers = users || [];
     let addedCount = 0;
     let skippedCount = 0;
-    const results = [];
+    const results: Array<{
+      email: string;
+      status: "added" | "skipped";
+      reason?: string;
+    }> = [];
 
-    // STEP 2: For each user
-    for (const user of users) {
-      console.log(`👤 Processing user: ${user.email}`);
+    for (const userRow of allUsers) {
+      const { data: existingCategory, error: existingCategoryError } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("user_id", userRow.id)
+        .eq("name", "Transfer Intern")
+        .maybeSingle();
 
-      // Check if user already has "Transfer Intern" category
-      const existingCategory = await db
-        .select()
-        .from(schema.categories)
-        .where(eq(schema.categories.userId, user.id))
-        .then((categories) =>
-          categories.find((c) => c.name === "Transfer Intern")
-        );
+      if (existingCategoryError) {
+        throw new Error(existingCategoryError.message);
+      }
 
       if (existingCategory) {
-        console.log(`   ⏭️  Category already exists, skipping\n`);
         skippedCount++;
         results.push({
-          email: user.email,
+          email: userRow.email,
           status: "skipped",
           reason: "category already exists",
         });
         continue;
       }
 
-      // Add the category
-      await db.insert(schema.categories).values({
-        userId: user.id,
+      const { error: insertError } = await supabase.from("categories").insert({
+        id: createId(),
+        user_id: userRow.id,
         name: "Transfer Intern",
-        type: "expense", // Technically expense, but should be treated neutral in reports
-        color: "#10b981", // Emerald green
+        type: "expense",
+        color: "#10b981",
         icon: "🔄",
-        description: "Transferuri între propriile conturi (nu afectează bugetul total)",
-        isSystemCategory: true,
+        description:
+          "Transferuri între propriile conturi (nu afectează bugetul total)",
+        is_system_category: true,
       });
 
-      console.log(`   ✅ Category added successfully\n`);
+      if (insertError) {
+        throw new Error(insertError.message);
+      }
+
       addedCount++;
       results.push({
-        email: user.email,
+        email: userRow.email,
         status: "added",
       });
     }
 
-    // STEP 3: Summary
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    console.log("✅ PROCESS COMPLETED\n");
-    console.log(`📊 Statistics:`);
-    console.log(`   - Users processed: ${users.length}`);
-    console.log(`   - Categories added: ${addedCount}`);
-    console.log(`   - Skipped (already existed): ${skippedCount}`);
-    console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
-
     return NextResponse.json({
       message: "Migration completed successfully",
-      totalUsers: users.length,
+      totalUsers: allUsers.length,
       categoriesAdded: addedCount,
       skipped: skippedCount,
       results,
     });
   } catch (error: any) {
-    console.error("❌ ERROR:", error);
+    console.error("Add Transfer Intern category error:", error);
     return NextResponse.json(
       {
         error: "Migration failed",

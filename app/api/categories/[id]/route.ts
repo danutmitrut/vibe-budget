@@ -6,29 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-async function getAuthUser(request: NextRequest) {
-  const supabase = await createClient();
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : null;
-
-  let user = null;
-
-  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
-    const bearerResult = await supabase.auth.getUser(bearerToken);
-    user = bearerResult.data.user;
-  }
-
-  if (!user) {
-    const cookieResult = await supabase.auth.getUser();
-    user = cookieResult.data.user;
-  }
-
-  return { supabase, user };
-}
+import { getSupabaseAuthContext } from "@/lib/supabase/auth-context";
 
 /**
  * DELETE /api/categories/[id]
@@ -38,7 +16,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -48,11 +26,11 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verificăm că categoria există (shared mode)
     const { data: category, error: getCategoryError } = await supabase
       .from("categories")
       .select("id, is_system_category")
       .eq("id", id)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (getCategoryError) {
@@ -78,7 +56,8 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from("categories")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id);
 
     if (deleteError) {
       throw new Error(deleteError.message);

@@ -14,78 +14,13 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { autoCategorizeByCategoryName } from "@/lib/auto-categorization/categories-rules";
 import { ensureDefaultSystemCategories } from "@/lib/categories/default-system-categories";
 import { isBalanceSnapshotDescription } from "@/lib/transactions/balance-snapshot";
-
-async function getAuthUser(request: NextRequest) {
-  const supabase = await createClient();
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : null;
-
-  let user = null;
-
-  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
-    const bearerResult = await supabase.auth.getUser(bearerToken);
-    user = bearerResult.data.user;
-  }
-
-  if (!user) {
-    const cookieResult = await supabase.auth.getUser();
-    user = cookieResult.data.user;
-  }
-
-  return { supabase, user };
-}
-
-async function ensureUserProfile(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
-) {
-  const fallbackName =
-    (user.user_metadata?.name as string | undefined) ||
-    user.email?.split("@")[0] ||
-    "Utilizator";
-  const fallbackCurrency =
-    (user.user_metadata?.native_currency as string | undefined) || "RON";
-
-  let effectiveUserId = user.id;
-
-  const { error: upsertUserError } = await supabase
-    .from("users")
-    .upsert(
-      {
-        id: user.id,
-        email: user.email || `${user.id}@placeholder.local`,
-        name: fallbackName,
-        native_currency: fallbackCurrency,
-      },
-      { onConflict: "id" }
-    );
-
-  if (upsertUserError) {
-    if (upsertUserError.message.includes("users_email_key") && user.email) {
-      const { data: existingUser, error: existingUserError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", user.email)
-        .maybeSingle();
-
-      if (existingUserError || !existingUser) {
-        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
-      }
-
-      effectiveUserId = existingUser.id;
-    } else {
-      throw new Error(upsertUserError.message);
-    }
-  }
-
-  return { id: effectiveUserId };
-}
+import {
+  ensureSupabaseUserProfile,
+  getSupabaseAuthContext,
+} from "@/lib/supabase/auth-context";
 
 /**
  * POST /api/transactions/recategorize
@@ -102,7 +37,7 @@ async function ensureUserProfile(
  */
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -110,13 +45,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profile = await ensureUserProfile(supabase, user);
+    const profile = await ensureSupabaseUserProfile(supabase, user);
     await ensureDefaultSystemCategories(supabase, profile.id);
 
-    // PASUL 1: SHARED MODE - Obținem toate tranzacțiile NECATEGORIZATE
     const { data: uncategorizedTransactions, error: transactionsError } = await supabase
       .from("transactions")
       .select("id, description")
+      .eq("user_id", profile.id)
       .is("category_id", null);
 
     if (transactionsError) {
@@ -137,15 +72,14 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // PASUL 2: SHARED MODE - Obținem toate categoriile
     const { data: userCategories, error: categoriesError } = await supabase
       .from("categories")
-      .select("id, name, icon");
+      .select("id, name, icon")
+      .eq("user_id", profile.id);
 
     if (categoriesError) {
       throw new Error(categoriesError.message);
     }
-
     const categories = userCategories || [];
 
     const { data: userKeywords, error: keywordsError } = await supabase
@@ -214,7 +148,8 @@ export async function POST(request: NextRequest) {
       const { error: updateError } = await supabase
         .from("transactions")
         .update({ category_id: categoryIdToAssign })
-        .eq("id", transaction.id);
+        .eq("id", transaction.id)
+        .eq("user_id", profile.id);
 
       if (updateError) {
         throw new Error(updateError.message);

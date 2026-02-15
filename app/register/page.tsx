@@ -82,23 +82,12 @@ export default function RegisterPage() {
         });
 
       if (insertError) {
-        // În cazul în care emailul există deja în public.users, actualizăm datele profilului.
-        if (insertError.message.includes('users_email_key')) {
-          const { error: updateError } = await supabase
-            .from("users")
-            .update({
-              name: formData.name,
-              native_currency: formData.nativeCurrency,
-              updated_at: new Date().toISOString(),
-            })
-            .eq("email", formData.email);
-
-          if (updateError) {
-            throw new Error(updateError.message);
-          }
-        } else {
-          throw new Error(insertError.message);
+        if (insertError.message.includes("users_email_key")) {
+          throw new Error(
+            "E_AUTH_ID_EMAIL_MISMATCH: contul există deja cu alt user_id. Contactează administratorul."
+          );
         }
+        throw new Error(insertError.message);
       }
 
       // Succes cu sesiune activă - redirect la dashboard

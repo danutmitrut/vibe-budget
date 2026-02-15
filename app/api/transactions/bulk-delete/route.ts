@@ -11,42 +11,24 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-async function getAuthUser(request: NextRequest) {
-  const supabase = await createClient();
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : null;
-
-  let user = null;
-
-  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
-    const bearerResult = await supabase.auth.getUser(bearerToken);
-    user = bearerResult.data.user;
-  }
-
-  if (!user) {
-    const cookieResult = await supabase.auth.getUser();
-    user = cookieResult.data.user;
-  }
-
-  return { supabase, user };
-}
+import {
+  ensureSupabaseUserProfile,
+  getSupabaseAuthContext,
+} from "@/lib/supabase/auth-context";
 
 /**
  * POST /api/transactions/bulk-delete
  */
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+    const profile = await ensureSupabaseUserProfile(supabase, user);
 
     const body = await request.json();
     const { transactionIds } = body;
@@ -70,10 +52,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // SHARED MODE: Verificăm doar că tranzacțiile există
     const { data: existingTransactions, error: existingError } = await supabase
       .from("transactions")
       .select("id")
+      .eq("user_id", profile.id)
       .in("id", sanitizedTransactionIds);
 
     if (existingError) {
@@ -91,6 +73,7 @@ export async function POST(request: NextRequest) {
     const { error: deleteError } = await supabase
       .from("transactions")
       .delete()
+      .eq("user_id", profile.id)
       .in("id", sanitizedTransactionIds);
 
     if (deleteError) {

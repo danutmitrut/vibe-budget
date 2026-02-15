@@ -1,29 +1,23 @@
 /**
  * API ROUTE: Delete User Account
  *
- * IMPORTANT: This permanently deletes a user and ALL associated data
- * - User record
- * - All categories (cascade)
- * - All transactions (cascade)
- * - All banks (cascade)
- * - All user keywords (cascade)
- *
+ * IMPORTANT: This permanently deletes a user and ALL associated data.
  * Usage: DELETE /api/admin/delete-user?email=user@example.com
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
+import { getSupabaseAuthContext } from "@/lib/supabase/auth-context";
+import { requireAdminEmail } from "@/lib/auth/admin";
 
 export async function DELETE(request: NextRequest) {
   try {
-    const currentUser = await getCurrentUser(request);
-    if (!currentUser) {
-      return NextResponse.json(
-        { error: "Unauthorized" },
-        { status: 401 }
-      );
+    const { supabase, user } = await getSupabaseAuthContext(request);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+    const adminCheck = requireAdminEmail(user.email);
+    if (adminCheck) {
+      return adminCheck;
     }
 
     const { searchParams } = new URL(request.url);
@@ -36,61 +30,57 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    console.log(`🗑️  Attempting to delete user: ${emailToDelete}`);
+    const { data: userToDelete, error: userError } = await supabase
+      .from("users")
+      .select("id, email")
+      .eq("email", emailToDelete)
+      .maybeSingle();
 
-    // Find the user
-    const userToDelete = await db
-      .select()
-      .from(schema.users)
-      .where(eq(schema.users.email, emailToDelete))
-      .limit(1);
+    if (userError) {
+      throw new Error(userError.message);
+    }
 
-    if (userToDelete.length === 0) {
-      return NextResponse.json(
-        { error: "User not found" },
-        { status: 404 }
+    if (!userToDelete) {
+      return NextResponse.json({ error: "User not found" }, { status: 404 });
+    }
+
+    const userId = userToDelete.id;
+
+    const [categoriesResult, transactionsResult, banksResult] = await Promise.all([
+      supabase.from("categories").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("transactions").select("id", { count: "exact", head: true }).eq("user_id", userId),
+      supabase.from("banks").select("id", { count: "exact", head: true }).eq("user_id", userId),
+    ]);
+
+    if (categoriesResult.error || transactionsResult.error || banksResult.error) {
+      throw new Error(
+        categoriesResult.error?.message ||
+          transactionsResult.error?.message ||
+          banksResult.error?.message ||
+          "Nu s-a putut calcula datele asociate"
       );
     }
 
-    const userId = userToDelete[0].id;
+    const { error: deleteUserError } = await supabase
+      .from("users")
+      .delete()
+      .eq("id", userId);
 
-    // Count associated data before deletion
-    const categories = await db
-      .select()
-      .from(schema.categories)
-      .where(eq(schema.categories.userId, userId));
-
-    const transactions = await db
-      .select()
-      .from(schema.transactions)
-      .where(eq(schema.transactions.userId, userId));
-
-    const banks = await db
-      .select()
-      .from(schema.banks)
-      .where(eq(schema.banks.userId, userId));
-
-    console.log(`📊 User has:`);
-    console.log(`   - ${categories.length} categories`);
-    console.log(`   - ${transactions.length} transactions`);
-    console.log(`   - ${banks.length} banks`);
-
-    // Delete the user (cascade will delete all associated data)
-    await db.delete(schema.users).where(eq(schema.users.id, userId));
-
-    console.log(`✅ User ${emailToDelete} deleted successfully`);
+    if (deleteUserError) {
+      throw new Error(deleteUserError.message);
+    }
 
     return NextResponse.json({
       message: "User deleted successfully",
       email: emailToDelete,
       deletedData: {
-        categories: categories.length,
-        transactions: transactions.length,
-        banks: banks.length,
+        categories: categoriesResult.count || 0,
+        transactions: transactionsResult.count || 0,
+        banks: banksResult.count || 0,
       },
     });
   } catch (error: any) {
-    console.error("❌ Delete user error:", error);
+    console.error("Delete user error:", error);
     return NextResponse.json(
       {
         error: "Failed to delete user",

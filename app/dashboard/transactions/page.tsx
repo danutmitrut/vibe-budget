@@ -13,12 +13,14 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
+import { getAuthHeaders } from "@/lib/supabase/auth-headers";
+import { normalizeTransactionRecord } from "@/lib/api/normalizers";
 
 interface Transaction {
   id: string;
   bankId: string | null;
   categoryId: string | null;
-  date: Date;
+  date: string;
   description: string;
   amount: number;
   currency: string;
@@ -75,25 +77,6 @@ export default function TransactionsPage() {
     fetchData();
   }, [selectedBankId]);
 
-  const getAuthHeaders = async () => {
-    const { data } = await supabase.auth.getSession();
-    const sessionToken = data.session?.access_token;
-    const storedToken = localStorage.getItem("token");
-
-    if (sessionToken && sessionToken !== storedToken) {
-      localStorage.setItem("token", sessionToken);
-    }
-
-    if (!sessionToken && storedToken) {
-      localStorage.removeItem("token");
-    }
-
-    const headers: Record<string, string> = {};
-    if (sessionToken) {
-      headers.Authorization = `Bearer ${sessionToken}`;
-    }
-    return headers;
-  };
 
   const fetchData = async () => {
     try {
@@ -137,15 +120,10 @@ export default function TransactionsPage() {
       const banksData = await banksRes.json();
       const categoriesData = await categoriesRes.json();
 
-      const normalizedTransactions = (transactionsData.transactions || []).map((transaction: any) => ({
-        id: transaction.id,
-        bankId: transaction.bankId ?? transaction.bank_id ?? null,
-        categoryId: transaction.categoryId ?? transaction.category_id ?? null,
-        date: transaction.date,
-        description: transaction.description,
-        amount: Number(transaction.amount),
-        currency: transaction.currency,
-      }));
+      const normalizedTransactions = (transactionsData.transactions || []).map(
+        (transaction: Record<string, unknown>) =>
+          normalizeTransactionRecord(transaction)
+      );
 
       setTransactions(normalizedTransactions);
       setBanks(banksData.banks);

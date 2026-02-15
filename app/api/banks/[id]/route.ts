@@ -7,29 +7,19 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { getSupabaseAuthContext } from "@/lib/supabase/auth-context";
 
 /**
  * DELETE /api/banks/[id]
  *
- * Șterge orice bancă (shared mode - orice user poate șterge orice).
+ * Șterge o bancă ce aparține utilizatorului curent.
  */
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const supabase = await createClient();
-    const authHeader = request.headers.get("authorization");
-    const bearerToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.slice(7).trim()
-      : null;
-
-    const authResult = bearerToken && bearerToken !== "null" && bearerToken !== "undefined"
-      ? await supabase.auth.getUser(bearerToken)
-      : await supabase.auth.getUser();
-
-    const user = authResult.data.user;
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -39,11 +29,11 @@ export async function DELETE(
 
     const { id } = await params;
 
-    // Verificăm că banca există (fără verificare ownership)
     const { data: bank, error: getBankError } = await supabase
       .from("banks")
       .select("id")
       .eq("id", id)
+      .eq("user_id", user.id)
       .maybeSingle();
 
     if (getBankError) {
@@ -61,7 +51,8 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from("banks")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", user.id);
 
     if (deleteError) {
       throw new Error(deleteError.message);

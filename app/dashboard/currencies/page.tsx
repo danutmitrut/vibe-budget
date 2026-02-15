@@ -7,6 +7,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
+import { getAuthHeaders } from "@/lib/supabase/auth-headers";
 
 interface Currency {
   id: string;
@@ -27,6 +29,7 @@ const commonCurrencies = [
 
 export default function CurrenciesPage() {
   const router = useRouter();
+  const supabase = createClient();
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -39,10 +42,11 @@ export default function CurrenciesPage() {
 
   const fetchCurrencies = async () => {
     try {
-      
+      const authHeaders = await getAuthHeaders(supabase);
 
       const response = await fetch("/api/currencies", {
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Eroare la încărcarea valutelor");
@@ -62,13 +66,14 @@ export default function CurrenciesPage() {
     setAdding(true);
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders(supabase);
       const response = await fetch("/api/currencies", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify(newCurrency),
       });
 
@@ -89,13 +94,14 @@ export default function CurrenciesPage() {
   const handleQuickAdd = async (curr: { code: string; symbol: string }) => {
     setAdding(true);
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders(supabase);
       await fetch("/api/currencies", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          ...authHeaders,
         },
+        credentials: "include",
         body: JSON.stringify({ ...curr, isNative: false }),
       });
       await fetchCurrencies();
@@ -110,10 +116,11 @@ export default function CurrenciesPage() {
     if (!confirm("Sigur vrei să ștergi această valută?")) return;
 
     try {
-      const token = localStorage.getItem("token");
+      const authHeaders = await getAuthHeaders(supabase);
       const response = await fetch(`/api/currencies/${id}`, {
         method: "DELETE",
-        
+        headers: authHeaders,
+        credentials: "include",
       });
 
       if (!response.ok) throw new Error("Eroare la ștergerea valutei");

@@ -32,7 +32,8 @@ export async function ensureDefaultSystemCategories(
 ) {
   const { data: existingCategories, error: existingCategoriesError } = await supabase
     .from("categories")
-    .select("name");
+    .select("name")
+    .eq("user_id", userId);
 
   if (existingCategoriesError) {
     throw new Error(existingCategoriesError.message);

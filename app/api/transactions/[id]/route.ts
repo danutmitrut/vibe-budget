@@ -8,29 +8,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
-
-async function getAuthUser(request: NextRequest) {
-  const supabase = await createClient();
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : null;
-
-  let user = null;
-
-  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
-    const bearerResult = await supabase.auth.getUser(bearerToken);
-    user = bearerResult.data.user;
-  }
-
-  if (!user) {
-    const cookieResult = await supabase.auth.getUser();
-    user = cookieResult.data.user;
-  }
-
-  return { supabase, user };
-}
+import {
+  ensureSupabaseUserProfile,
+  getSupabaseAuthContext,
+} from "@/lib/supabase/auth-context";
+import { normalizeTransactionRecord } from "@/lib/api/normalizers";
 
 /**
  * PATCH /api/transactions/[id]
@@ -46,7 +28,7 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -54,14 +36,16 @@ export async function PATCH(
       );
     }
 
+    const profile = await ensureSupabaseUserProfile(supabase, user);
+
     const { id } = await params;
     const body = await request.json();
 
-    // SHARED MODE: Verificăm doar că tranzacția există
     const { data: existing, error: existingError } = await supabase
       .from("transactions")
       .select("id, category_id")
       .eq("id", id)
+      .eq("user_id", profile.id)
       .maybeSingle();
 
     if (existingError) {
@@ -75,6 +59,26 @@ export async function PATCH(
       );
     }
 
+    if (body.categoryId) {
+      const { data: category, error: categoryError } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("id", body.categoryId)
+        .eq("user_id", profile.id)
+        .maybeSingle();
+
+      if (categoryError) {
+        throw new Error(categoryError.message);
+      }
+
+      if (!category) {
+        return NextResponse.json(
+          { error: "Categoria selectată nu aparține utilizatorului curent." },
+          { status: 400 }
+        );
+      }
+    }
+
     // Actualizăm tranzacția (doar categoryId - notes și isCategorized nu există în PostgreSQL schema)
     const { data: updated, error: updateError } = await supabase
       .from("transactions")
@@ -82,6 +86,7 @@ export async function PATCH(
         category_id: body.categoryId || existing.category_id,
       })
       .eq("id", id)
+      .eq("user_id", profile.id)
       .select("*")
       .single();
 
@@ -91,7 +96,7 @@ export async function PATCH(
 
     return NextResponse.json({
       message: "Tranzacție actualizată cu succes",
-      transaction: updated,
+      transaction: normalizeTransactionRecord(updated),
     });
   } catch (error) {
     console.error("Update transaction error:", error);
@@ -110,7 +115,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -118,13 +123,15 @@ export async function DELETE(
       );
     }
 
+    const profile = await ensureSupabaseUserProfile(supabase, user);
+
     const { id } = await params;
 
-    // SHARED MODE: Verificăm doar că tranzacția există
     const { data: existing, error: existingError } = await supabase
       .from("transactions")
       .select("id")
       .eq("id", id)
+      .eq("user_id", profile.id)
       .maybeSingle();
 
     if (existingError) {
@@ -142,7 +149,8 @@ export async function DELETE(
     const { error: deleteError } = await supabase
       .from("transactions")
       .delete()
-      .eq("id", id);
+      .eq("id", id)
+      .eq("user_id", profile.id);
 
     if (deleteError) {
       throw new Error(deleteError.message);

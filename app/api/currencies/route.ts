@@ -8,27 +8,36 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { db, schema } from "@/lib/db";
-import { getCurrentUser } from "@/lib/auth/get-current-user";
-import { eq } from "drizzle-orm";
+import { createId } from "@paralleldrive/cuid2";
+import {
+  ensureSupabaseUserProfile,
+  getSupabaseAuthContext,
+} from "@/lib/supabase/auth-context";
+import { normalizeCurrencyRecord } from "@/lib/api/normalizers";
 
 /**
  * GET /api/currencies
  */
 export async function GET(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
-      return NextResponse.json(
-        { error: "Neautentificat" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Neautentificat" }, { status: 401 });
     }
 
-    // SHARED MODE: Toți userii văd toate valutele
-    const currencies = await db
-      .select()
-      .from(schema.currencies);
+    const { data: currenciesData, error: currenciesError } = await supabase
+      .from("currencies")
+      .select("id, user_id, code, name, symbol, created_at")
+      .eq("user_id", user.id)
+      .order("created_at", { ascending: false });
+
+    if (currenciesError) {
+      throw new Error(currenciesError.message);
+    }
+
+    const currencies = (currenciesData || []).map((currency) =>
+      normalizeCurrencyRecord(currency)
+    );
 
     return NextResponse.json({ currencies });
   } catch (error) {
@@ -52,18 +61,15 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const user = await getCurrentUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
-      return NextResponse.json(
-        { error: "Neautentificat" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Neautentificat" }, { status: 401 });
     }
 
+    const profile = await ensureSupabaseUserProfile(supabase, user);
     const body = await request.json();
     const { code, symbol, name } = body;
 
-    // Validare
     if (!code || !symbol) {
       return NextResponse.json(
         { error: "Cod și simbol sunt obligatorii" },
@@ -71,21 +77,28 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Creăm valuta (name e opțional, folosim code ca fallback)
-    const newCurrency = await db
-      .insert(schema.currencies)
-      .values({
-        userId: user.id,
-        code: code.toUpperCase(),
-        name: name || code.toUpperCase(), // Folosim name din body sau code ca fallback
+    const upperCode = String(code).toUpperCase();
+
+    const { data: insertedCurrency, error: insertError } = await supabase
+      .from("currencies")
+      .insert({
+        id: createId(),
+        user_id: profile.id,
+        code: upperCode,
+        name: name || upperCode,
         symbol,
       })
-      .returning();
+      .select("id, user_id, code, name, symbol, created_at")
+      .single();
+
+    if (insertError || !insertedCurrency) {
+      throw new Error(insertError?.message || "Nu s-a putut crea valuta");
+    }
 
     return NextResponse.json(
       {
         message: "Valută adăugată cu succes",
-        currency: newCurrency[0]
+        currency: normalizeCurrencyRecord(insertedCurrency),
       },
       { status: 201 }
     );

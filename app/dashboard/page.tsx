@@ -78,24 +78,7 @@ export default function DashboardPage() {
           return;
         }
 
-        // Fallback 1: Dacă profilul pe ID lipsește, încercăm după email.
-        const { data: emailUser, error: emailUserError } = await supabase
-          .from("users")
-          .select("*")
-          .eq("email", authUser.email || "")
-          .maybeSingle();
-
-        if (emailUserError) {
-          throw new Error("Nu s-au putut încărca datele utilizatorului");
-        }
-
-        if (emailUser) {
-          setUser(normalizeUser(emailUser));
-          fetchAIInsights();
-          return;
-        }
-
-        // Fallback 2: Creăm profil minim dacă nu există deloc în public.users.
+        // Dacă profilul lipsește, îl creăm strict pe același auth user id.
         const { data: createdUser, error: createUserError } = await supabase
           .from("users")
           .insert({

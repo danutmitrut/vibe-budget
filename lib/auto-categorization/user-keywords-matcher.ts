@@ -12,8 +12,7 @@
  * 4. La următorul CSV cu "Cofidis" → aplicăm automat categoria Cumpărături
  */
 
-import { db, schema } from "@/lib/db";
-import { eq } from "drizzle-orm";
+import { createClient } from "@/lib/supabase/server";
 
 /**
  * Verifică dacă descrierea tranzacției conține un keyword personalizat salvat de user
@@ -29,18 +28,27 @@ export async function matchUserKeyword(
   if (!description || !userId) return null;
 
   const lowerDesc = description.toLowerCase();
+  const supabase = await createClient();
 
   // Obținem toate keyword-urile utilizatorului
-  const userKeywords = await db
-    .select()
-    .from(schema.userKeywords)
-    .where(eq(schema.userKeywords.userId, userId));
+  const { data: userKeywordsData, error: userKeywordsError } = await supabase
+    .from("user_keywords")
+    .select("keyword, category_id")
+    .eq("user_id", userId);
+
+  if (userKeywordsError) {
+    throw new Error(userKeywordsError.message);
+  }
+
+  const userKeywords = userKeywordsData || [];
 
   // Căutăm primul keyword care se potrivește
   for (const userKeyword of userKeywords) {
     if (lowerDesc.includes(userKeyword.keyword.toLowerCase())) {
-      console.log(`🎯 User keyword match: "${description}" → "${userKeyword.keyword}" → category ${userKeyword.categoryId}`);
-      return userKeyword.categoryId; // Returnăm direct categoryId
+      console.log(
+        `🎯 User keyword match: "${description}" → "${userKeyword.keyword}" → category ${userKeyword.category_id}`
+      );
+      return userKeyword.category_id; // Returnăm direct categoryId
     }
   }
 

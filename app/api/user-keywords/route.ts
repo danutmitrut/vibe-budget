@@ -11,76 +11,11 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
 import { createId } from "@paralleldrive/cuid2";
-
-async function getAuthUser(request: NextRequest) {
-  const supabase = await createClient();
-  const authHeader = request.headers.get("authorization");
-  const bearerToken = authHeader?.startsWith("Bearer ")
-    ? authHeader.slice(7).trim()
-    : null;
-
-  let user = null;
-
-  if (bearerToken && bearerToken !== "null" && bearerToken !== "undefined") {
-    const bearerResult = await supabase.auth.getUser(bearerToken);
-    user = bearerResult.data.user;
-  }
-
-  if (!user) {
-    const cookieResult = await supabase.auth.getUser();
-    user = cookieResult.data.user;
-  }
-
-  return { supabase, user };
-}
-
-async function ensureUserProfile(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
-) {
-  const fallbackName =
-    (user.user_metadata?.name as string | undefined) ||
-    user.email?.split("@")[0] ||
-    "Utilizator";
-  const fallbackCurrency =
-    (user.user_metadata?.native_currency as string | undefined) || "RON";
-
-  let effectiveUserId = user.id;
-
-  const { error: upsertUserError } = await supabase
-    .from("users")
-    .upsert(
-      {
-        id: user.id,
-        email: user.email || `${user.id}@placeholder.local`,
-        name: fallbackName,
-        native_currency: fallbackCurrency,
-      },
-      { onConflict: "id" }
-    );
-
-  if (upsertUserError) {
-    if (upsertUserError.message.includes("users_email_key") && user.email) {
-      const { data: existingUser, error: existingUserError } = await supabase
-        .from("users")
-        .select("id")
-        .eq("email", user.email)
-        .maybeSingle();
-
-      if (existingUserError || !existingUser) {
-        throw new Error(existingUserError?.message || "Nu s-a putut valida utilizatorul");
-      }
-
-      effectiveUserId = existingUser.id;
-    } else {
-      throw new Error(upsertUserError.message);
-    }
-  }
-
-  return { id: effectiveUserId };
-}
+import {
+  ensureSupabaseUserProfile,
+  getSupabaseAuthContext,
+} from "@/lib/supabase/auth-context";
 
 /**
  * GET /api/user-keywords
@@ -89,17 +24,19 @@ async function ensureUserProfile(
  */
 export async function GET(request: NextRequest) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+    const profile = await ensureSupabaseUserProfile(supabase, user);
 
     const { data: keywordsData, error: keywordsError } = await supabase
       .from("user_keywords")
-      .select("id, keyword, category_id, created_at");
+      .select("id, keyword, category_id, created_at")
+      .eq("user_id", profile.id);
 
     if (keywordsError) {
       throw new Error(keywordsError.message);
@@ -107,7 +44,8 @@ export async function GET(request: NextRequest) {
 
     const { data: categoriesData, error: categoriesError } = await supabase
       .from("categories")
-      .select("id, name, icon, color");
+      .select("id, name, icon, color")
+      .eq("user_id", profile.id);
 
     if (categoriesError) {
       throw new Error(categoriesError.message);
@@ -151,7 +89,7 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
@@ -159,7 +97,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const profile = await ensureUserProfile(supabase, user);
+    const profile = await ensureSupabaseUserProfile(supabase, user);
 
     const body = await request.json();
     const { keyword, categoryId } = body;
@@ -174,10 +112,29 @@ export async function POST(request: NextRequest) {
 
     const normalizedKeyword = keyword.toLowerCase().trim();
 
-    // SHARED MODE: Verificăm dacă keyword-ul există deja (global, nu per user)
+    const { data: category, error: categoryError } = await supabase
+      .from("categories")
+      .select("id")
+      .eq("id", categoryId)
+      .eq("user_id", profile.id)
+      .maybeSingle();
+
+    if (categoryError) {
+      throw new Error(categoryError.message);
+    }
+
+    if (!category) {
+      return NextResponse.json(
+        { error: "Categoria selectată nu aparține utilizatorului curent." },
+        { status: 400 }
+      );
+    }
+
+    // Verificăm dacă keyword-ul există deja pentru userul curent
     const { data: existingKeyword, error: existingKeywordError } = await supabase
       .from("user_keywords")
       .select("id, keyword, category_id, user_id, created_at")
+      .eq("user_id", profile.id)
       .eq("keyword", normalizedKeyword)
       .maybeSingle();
 
@@ -191,6 +148,7 @@ export async function POST(request: NextRequest) {
         .from("user_keywords")
         .update({ category_id: categoryId })
         .eq("id", existingKeyword.id)
+        .eq("user_id", profile.id)
         .select("id, keyword, category_id, user_id, created_at")
         .single();
 
@@ -256,13 +214,14 @@ export async function POST(request: NextRequest) {
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { supabase, user } = await getAuthUser(request);
+    const { supabase, user } = await getSupabaseAuthContext(request);
     if (!user) {
       return NextResponse.json(
         { error: "Neautentificat" },
         { status: 401 }
       );
     }
+    const profile = await ensureSupabaseUserProfile(supabase, user);
 
     const { searchParams } = new URL(request.url);
     const keywordId = searchParams.get("id");
@@ -274,11 +233,11 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    // SHARED MODE: Oricine poate șterge orice keyword
     const { error: deleteError } = await supabase
       .from("user_keywords")
       .delete()
-      .eq("id", keywordId);
+      .eq("id", keywordId)
+      .eq("user_id", profile.id);
 
     if (deleteError) {
       throw new Error(deleteError.message);

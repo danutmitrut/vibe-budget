@@ -1,15 +1,10 @@
 /**
- * MIDDLEWARE - Supabase Auth Session Refresh (SHARED MODE)
+ * MIDDLEWARE - Supabase Auth Session Refresh (PER-USER MODE)
  *
  * SCOP:
  * 1. Refresh automat session cookies pentru utilizatori autentificați
  * 2. Protejează rute - doar useri autentificați au acces
  * 3. Redirect utilizatori ne-autentificați la /login
- *
- * ATENȚIE: Aplicație în SHARED MODE
- * - Toți userii autentificați văd TOATE datele (finanțe partajate)
- * - Nu există separare între useri la nivel de date
- * - RLS policies permit acces complet pentru orice user autentificat
  */
 
 import { createServerClient } from '@supabase/ssr';
