@@ -51,14 +51,16 @@ export default function RegisterPage() {
         throw new Error("Nu s-a putut crea utilizatorul");
       }
 
-      // Pas 2: Salvează datele custom în tabela users
+      // Pas 2: Salvează datele custom în tabela users (upsert pentru a evita duplicate)
       const { error: insertError } = await supabase
         .from("users")
-        .insert({
+        .upsert({
           id: authData.user.id,
           email: formData.email,
           name: formData.name,
           native_currency: formData.nativeCurrency,
+        }, {
+          onConflict: 'id'
         });
 
       if (insertError) {
