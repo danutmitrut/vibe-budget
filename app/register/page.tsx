@@ -91,8 +91,7 @@ export default function RegisterPage() {
       }
 
       // Succes cu sesiune activă - redirect la dashboard
-      router.push("/dashboard");
-      router.refresh();
+      router.replace("/dashboard");
     } catch (err: any) {
       const message = err?.message || "Eroare la înregistrare";
       if (message.toLowerCase().includes("already registered")) {

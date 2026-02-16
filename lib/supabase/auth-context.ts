@@ -45,23 +45,32 @@ export async function ensureSupabaseUserProfile(
   const fallbackCurrency =
     (user.user_metadata?.native_currency as string | undefined) || "RON";
 
-  const { error: upsertUserError } = await supabase.from("users").upsert(
-    {
-      id: user.id,
-      email: user.email || `${user.id}@placeholder.local`,
-      name: fallbackName,
-      native_currency: fallbackCurrency,
-    },
-    { onConflict: "id" }
-  );
+  const profilePayload = {
+    id: user.id,
+    email: user.email || `${user.id}@placeholder.local`,
+    name: fallbackName,
+    native_currency: fallbackCurrency,
+  };
 
-  if (upsertUserError) {
-    if (upsertUserError.message.includes("users_email_key")) {
+  let { error: upsertUserError } = await supabase
+    .from("users")
+    .upsert(profilePayload, { onConflict: "id" });
+
+  if (upsertUserError?.message.includes("users_email_key")) {
+    const { error: reconcileError } = await supabase.rpc("reconcile_current_user_profile");
+    if (reconcileError) {
       throw new Error(
-        "E_AUTH_ID_EMAIL_MISMATCH: email-ul există deja cu alt user_id. Rulează migrarea de reconciliere înainte de per-user mode."
+        "E_AUTH_ID_EMAIL_MISMATCH: email-ul există deja cu alt user_id și reconcilierea automată a eșuat."
       );
     }
 
+    const retry = await supabase
+      .from("users")
+      .upsert(profilePayload, { onConflict: "id" });
+    upsertUserError = retry.error;
+  }
+
+  if (upsertUserError) {
     throw new Error(upsertUserError.message);
   }
 

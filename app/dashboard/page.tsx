@@ -37,6 +37,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileError, setProfileError] = useState<string | null>(null);
   const [healthScore, setHealthScore] = useState<HealthScore | null>(null);
   const [anomalies, setAnomalies] = useState<Anomaly[]>([]);
   const [showAnomalies, setShowAnomalies] = useState(false);
@@ -53,13 +54,22 @@ export default function DashboardPage() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        setProfileError(null);
+
         // Verificăm sesiunea Supabase
         const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
 
         if (authError || !authUser) {
-          router.push("/login");
+          router.replace("/login");
           return;
         }
+
+        const userPayload = {
+          id: authUser.id,
+          email: authUser.email || "",
+          name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "Utilizator",
+          native_currency: authUser.user_metadata?.native_currency || "RON",
+        };
 
         // Obținem datele utilizatorului din tabela users
         const { data: userData, error: userError } = await supabase
@@ -79,16 +89,44 @@ export default function DashboardPage() {
         }
 
         // Dacă profilul lipsește, îl creăm strict pe același auth user id.
-        const { data: createdUser, error: createUserError } = await supabase
+        let { data: createdUser, error: createUserError } = await supabase
           .from("users")
-          .insert({
-            id: authUser.id,
-            email: authUser.email || "",
-            name: authUser.user_metadata?.name || authUser.email?.split("@")[0] || "Utilizator",
-            native_currency: authUser.user_metadata?.native_currency || "RON",
-          })
+          .insert(userPayload)
           .select("*")
           .single();
+
+        if (createUserError?.message.includes("users_email_key")) {
+          const { error: reconcileError } = await supabase.rpc("reconcile_current_user_profile");
+          if (reconcileError) {
+            throw new Error(
+              "Sesiunea este validă, dar profilul nu s-a putut sincroniza. Reîncearcă după refresh."
+            );
+          }
+
+          const retry = await supabase
+            .from("users")
+            .select("*")
+            .eq("id", authUser.id)
+            .maybeSingle();
+
+          if (retry.error) {
+            throw new Error("Nu s-au putut încărca datele utilizatorului");
+          }
+
+          if (retry.data) {
+            setUser(normalizeUser(retry.data));
+            fetchAIInsights();
+            return;
+          }
+
+          const recreate = await supabase
+            .from("users")
+            .insert(userPayload)
+            .select("*")
+            .single();
+          createdUser = recreate.data;
+          createUserError = recreate.error;
+        }
 
         if (createUserError || !createdUser) {
           throw new Error("Nu s-a putut crea profilul utilizatorului");
@@ -100,7 +138,9 @@ export default function DashboardPage() {
         fetchAIInsights();
       } catch (error) {
         console.error("Auth error:", error);
-        router.push("/login");
+        const errorMessage =
+          error instanceof Error ? error.message : "Nu s-au putut încărca datele contului";
+        setProfileError(errorMessage);
       } finally {
         setLoading(false);
       }
@@ -163,6 +203,31 @@ export default function DashboardPage() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-xl text-gray-800">Se încarcă...</div>
+      </div>
+    );
+  }
+
+  if (profileError && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 p-6">
+        <div className="max-w-xl w-full bg-white border border-red-200 rounded-xl shadow p-6">
+          <h2 className="text-xl font-bold text-gray-900 mb-3">Sesiune activă, profil nesincronizat</h2>
+          <p className="text-gray-700 mb-5">{profileError}</p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => window.location.reload()}
+              className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+            >
+              Reîncearcă
+            </button>
+            <button
+              onClick={() => router.replace("/login")}
+              className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 transition"
+            >
+              Înapoi la login
+            </button>
+          </div>
+        </div>
       </div>
     );
   }

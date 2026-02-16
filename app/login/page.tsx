@@ -24,6 +24,10 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const supabase = createClient();
 
+  const isEmailIdMismatch = (message: string) =>
+    message.includes("users_email_key") ||
+    message.includes("E_AUTH_ID_EMAIL_MISMATCH");
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -60,21 +64,37 @@ export default function LoginPage() {
       // Asigurăm existența profilului în public.users pentru dashboard.
       const defaultName = data.user?.user_metadata?.name || formData.email.split("@")[0] || "Utilizator";
       const defaultCurrency = data.user?.user_metadata?.native_currency || "RON";
-      await supabase
+      const upsertPayload = {
+        id: data.user.id,
+        email: data.user.email || formData.email,
+        name: defaultName,
+        native_currency: defaultCurrency,
+      };
+
+      let { error: profileError } = await supabase
         .from("users")
-        .upsert(
-          {
-            id: data.user.id,
-            email: data.user.email || formData.email,
-            name: defaultName,
-            native_currency: defaultCurrency,
-          },
-          { onConflict: "id" }
-        );
+        .upsert(upsertPayload, { onConflict: "id" });
+
+      if (profileError && isEmailIdMismatch(profileError.message)) {
+        const { error: reconcileError } = await supabase.rpc("reconcile_current_user_profile");
+        if (reconcileError) {
+          throw new Error(
+            "Sesiunea este validă, dar profilul nu s-a putut sincroniza. Încearcă din nou în câteva secunde."
+          );
+        }
+
+        const retry = await supabase
+          .from("users")
+          .upsert(upsertPayload, { onConflict: "id" });
+        profileError = retry.error;
+      }
+
+      if (profileError) {
+        throw new Error(profileError.message);
+      }
 
       // Succes - redirect la dashboard
-      router.push("/dashboard");
-      router.refresh(); // Refresh pentru a actualiza session
+      router.replace("/dashboard");
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : "Eroare la autentificare";
       setError(message);
