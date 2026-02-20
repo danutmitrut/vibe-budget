@@ -33,7 +33,7 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      // Pas 1: Creează cont în Supabase Auth
+      // Pas 1: Încearcă să creezi cont în Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
         email: formData.email,
         password: formData.password,
@@ -44,6 +44,44 @@ export default function RegisterPage() {
           },
         },
       });
+
+      // Dacă signUp eșuează cu duplicate/constraint, încearcă login
+      if (signUpError && signUpError.message.includes("duplicate")) {
+        console.log("User already exists, attempting login instead...");
+
+        const { data: loginData, error: loginError } = await supabase.auth.signInWithPassword({
+          email: formData.email,
+          password: formData.password,
+        });
+
+        if (loginError) {
+          throw new Error("Acest email este deja înregistrat. Încearcă să te autentifici sau folosește recuperare parolă.");
+        }
+
+        if (!loginData.user) {
+          throw new Error("Eroare la autentificare");
+        }
+
+        // Update user data in public.users
+        const { error: updateError } = await supabase
+          .from("users")
+          .upsert({
+            id: loginData.user.id,
+            email: formData.email,
+            name: formData.name,
+            native_currency: formData.nativeCurrency,
+          }, {
+            onConflict: 'id'
+          });
+
+        if (updateError) {
+          console.warn("Could not update user data:", updateError);
+        }
+
+        router.push("/dashboard");
+        router.refresh();
+        return;
+      }
 
       if (signUpError) {
         // Dacă utilizatorul există deja, încercăm resend pentru emailul de confirmare.

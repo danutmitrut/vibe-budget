@@ -293,7 +293,7 @@ export default function DashboardPage() {
                           className="block mt-3 text-center text-sm font-semibold text-indigo-600 hover:text-indigo-700"
                           onClick={() => setShowAnomalies(false)}
                         >
-                          Vezi toate insights →
+                          Vezi toate alertele →
                         </Link>
                       </div>
                     </div>
@@ -317,10 +317,10 @@ export default function DashboardPage() {
         {/* Welcome Card */}
         <div className="bg-white rounded-xl shadow-lg p-8 mb-8">
           <h2 className="text-3xl font-bold text-gray-900 mb-4">
-            Bine ai venit, {user?.name}! 🎉
+            Salut, {user?.name}!
           </h2>
           <p className="text-gray-800 mb-4">
-            Moneda ta nativă: <span className="font-semibold">{user?.nativeCurrency}</span>
+            Moneda principală: <span className="font-semibold">{user?.nativeCurrency}</span>
           </p>
           <p className="text-gray-800">
             Email: <span className="font-semibold">{user?.email}</span>
@@ -333,7 +333,7 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">📤</div>
             <h3 className="text-lg font-semibold mb-2">Importă tranzacții</h3>
             <p className="text-gray-700 text-sm">
-              Încarcă fișiere CSV sau Excel
+              Încarcă extrasul de cont
             </p>
           </Link>
 
@@ -341,15 +341,15 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">💳</div>
             <h3 className="text-lg font-semibold mb-2">Tranzacții</h3>
             <p className="text-gray-700 text-sm">
-              Vezi și categorizează tranzacții
+              Toate tranzacțiile tale
             </p>
           </Link>
 
           <Link href="/dashboard/reports" className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
             <div className="text-4xl mb-3">📈</div>
-            <h3 className="text-lg font-semibold mb-2">Rapoarte și Grafice</h3>
+            <h3 className="text-lg font-semibold mb-2">Rapoarte</h3>
             <p className="text-white/90 text-sm">
-              Statistici vizuale și analize
+              Grafice și statistici
             </p>
           </Link>
 
@@ -357,7 +357,7 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">📊</div>
             <h3 className="text-lg font-semibold mb-2">Raport Pivot</h3>
             <p className="text-white/90 text-sm">
-              Tabel pivot: categorii × luni
+              Cheltuieli pe luni și categorii
             </p>
           </Link>
 
@@ -365,15 +365,15 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">🤖</div>
             <h3 className="text-lg font-semibold mb-2">AI Insights</h3>
             <p className="text-white/90 text-sm">
-              Analiză inteligentă by Claude AI
+              Sfaturi personalizate de la AI
             </p>
           </Link>
 
           <Link href="/dashboard/banks" className="bg-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
             <div className="text-4xl mb-3">🏦</div>
-            <h3 className="text-lg font-semibold mb-2">Gestionează bănci</h3>
+            <h3 className="text-lg font-semibold mb-2">Bănci</h3>
             <p className="text-gray-700 text-sm">
-              Adaugă și editează băncile tale
+              Băncile tale
             </p>
           </Link>
 
@@ -381,15 +381,15 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">📁</div>
             <h3 className="text-lg font-semibold mb-2">Categorii</h3>
             <p className="text-gray-700 text-sm">
-              Creează categorii personalizate
+              Organizează-ți cheltuielile
             </p>
           </Link>
 
           <Link href="/dashboard/keywords" className="bg-gradient-to-br from-blue-500 to-cyan-600 text-white rounded-xl shadow p-6 hover:shadow-lg transition cursor-pointer">
             <div className="text-4xl mb-3">🔑</div>
-            <h3 className="text-lg font-semibold mb-2">Keyword-uri</h3>
+            <h3 className="text-lg font-semibold mb-2">Reguli</h3>
             <p className="text-white/90 text-sm">
-              Gestionează auto-categorizarea
+              Reguli automate de categorizare
             </p>
           </Link>
 
@@ -397,7 +397,7 @@ export default function DashboardPage() {
             <div className="text-4xl mb-3">💱</div>
             <h3 className="text-lg font-semibold mb-2">Valute</h3>
             <p className="text-gray-700 text-sm">
-              Gestionează valutele tale
+              Valutele tale
             </p>
           </Link>
         </div>

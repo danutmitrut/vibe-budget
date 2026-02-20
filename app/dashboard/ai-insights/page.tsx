@@ -169,7 +169,7 @@ export default function AIInsightsPage() {
             <div>
               <h1 className="text-2xl font-bold text-gray-900">🤖 AI Insights</h1>
               <p className="text-sm text-gray-600 mt-1">
-                Analiză financiară inteligentă powered by Claude AI
+                Analiză financiară cu ajutorul AI
               </p>
             </div>
             <Link
@@ -414,9 +414,9 @@ export default function AIInsightsPage() {
         {!healthScore && !loading && (
           <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
             <div className="text-4xl mb-4">📊</div>
-            <h3 className="text-xl font-bold mb-2">Nu există suficiente date</h3>
+            <h3 className="text-xl font-bold mb-2">Prea puține date pentru analiză</h3>
             <p className="text-gray-700 mb-4">
-              Importă mai multe tranzacții pentru a primi insights AI personalizate.
+              Importă mai multe tranzacții ca să primești sfaturi personalizate.
             </p>
             <Link
               href="/dashboard/upload"

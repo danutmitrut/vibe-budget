@@ -113,7 +113,7 @@ export default function CurrenciesPage() {
   };
 
   const handleDeleteCurrency = async (id: string) => {
-    if (!confirm("Sigur vrei să ștergi această valută?")) return;
+    if (!confirm("Ștergi valuta? Acțiunea e permanentă.")) return;
 
     try {
       const authHeaders = await getAuthHeaders(supabase);
@@ -224,7 +224,7 @@ export default function CurrenciesPage() {
           <h2 className="text-xl font-bold mb-4">Valutele tale ({currencies.length})</h2>
           {currencies.length === 0 ? (
             <p className="text-gray-800 text-center py-8">
-              Nu ai adăugat încă valute. Începe cu adăugarea rapidă! 💱
+              Nicio valută adăugată. Alege din lista de mai sus.
             </p>
           ) : (
             <div className="space-y-3">

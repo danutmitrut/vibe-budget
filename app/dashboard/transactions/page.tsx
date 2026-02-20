@@ -330,7 +330,7 @@ export default function TransactionsPage() {
   };
 
   const handleDelete = async (transactionId: string) => {
-    if (!confirm("Sigur vrei să ștergi această tranzacție?")) return;
+    if (!confirm("Ștergi tranzacția? Acțiunea e permanentă.")) return;
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -349,7 +349,7 @@ export default function TransactionsPage() {
   };
 
   const handleRecategorize = async () => {
-    if (!confirm("Re-categorizare automată va procesa toate tranzacțiile necategorizate bazat pe regulile curente. Continui?")) {
+    if (!confirm("Categorizarea automată va procesa toate tranzacțiile necategorizate. Continui?")) {
       return;
     }
 
@@ -416,7 +416,7 @@ export default function TransactionsPage() {
       return;
     }
 
-    if (!confirm(`Sigur vrei să ștergi ${selectedIds.size} tranzacții?`)) return;
+    if (!confirm(`Ștergi ${selectedIds.size} tranzacții? Acțiunea e permanentă.`)) return;
 
     setIsDeleting(true);
     try {
@@ -532,7 +532,7 @@ export default function TransactionsPage() {
                 disabled={isRecategorizing}
                 className="px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition whitespace-nowrap"
               >
-                {isRecategorizing ? "Re-categorizare..." : "🔄 Re-categorizare automată"}
+                {isRecategorizing ? "Se categorizează..." : "🔄 Categorizează automat"}
               </button>
             </div>
           </div>
@@ -554,7 +554,7 @@ export default function TransactionsPage() {
                 onClick={() => setSelectedIds(new Set())}
                 className="text-sm text-indigo-600 hover:text-indigo-800 underline"
               >
-                Deselectează tot
+                Deselectează
               </button>
             </div>
             <div className="flex items-center gap-3">
@@ -592,10 +592,11 @@ export default function TransactionsPage() {
         {filteredTransactions.length === 0 ? (
           <div className="bg-white rounded-xl shadow p-8 text-center">
             <p className="text-gray-800 mb-4">
-              Nu există tranzacții.{" "}
+              Nicio tranzacție încă.{" "}
               <Link href="/dashboard/upload" className="text-indigo-600 underline">
-                Importă tranzacții
-              </Link>
+                Importă un extras de cont
+              </Link>{" "}
+              pentru a începe.
             </p>
           </div>
         ) : (

@@ -144,10 +144,10 @@ export default function PivotReportPage() {
           <div className="flex justify-between items-center">
             <div>
               <h1 className="text-2xl font-bold text-gray-900">
-                📊 Raport Pivot - Analiza pe Luni
+                📊 Raport Pivot
               </h1>
               <p className="text-sm text-gray-600 mt-1">
-                Categorii × Luni cu colorare dinamică și analiză tendințe
+                Cheltuieli pe categorii și luni, cu tendințe
               </p>
             </div>
             <Link

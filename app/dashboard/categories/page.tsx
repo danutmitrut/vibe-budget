@@ -95,7 +95,7 @@ export default function CategoriesPage() {
   };
 
   const handleDeleteCategory = async (id: string) => {
-    if (!confirm("Sigur vrei să ștergi această categorie?")) return;
+    if (!confirm("Ștergi categoria? Acțiunea e permanentă.")) return;
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -225,7 +225,7 @@ export default function CategoriesPage() {
           <h2 className="text-xl font-bold mb-4">Categoriile tale ({categories.length})</h2>
           {categories.length === 0 ? (
             <p className="text-gray-800 text-center py-8">
-              Nu ai adăugat încă categorii. Începe acum! 📁
+              Nicio categorie încă. Adaugă prima categorie mai sus.
             </p>
           ) : (
             <div className="grid md:grid-cols-2 gap-4">

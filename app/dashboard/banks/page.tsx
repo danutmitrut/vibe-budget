@@ -96,7 +96,7 @@ export default function BanksPage() {
 
   // PASUL 3: Ștergem o bancă
   const handleDeleteBank = async (id: string) => {
-    if (!confirm("Sigur vrei să ștergi această bancă?")) return;
+    if (!confirm("Ștergi banca? Acțiunea e permanentă.")) return;
 
     try {
       const authHeaders = await getAuthHeaders();
@@ -184,7 +184,7 @@ export default function BanksPage() {
           <h2 className="text-xl font-bold mb-4">Băncile tale ({banks.length})</h2>
           {banks.length === 0 ? (
             <p className="text-gray-800 text-center py-8">
-              Nu ai adăugat încă nicio bancă. Adaugă prima bancă mai sus! 🏦
+              Nicio bancă adăugată. Începe prin a adăuga banca ta mai sus.
             </p>
           ) : (
             <div className="space-y-3">

@@ -220,7 +220,7 @@ export default function ReportsPage() {
       <header className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-gray-900">Rapoarte și Grafice</h1>
+            <h1 className="text-2xl font-bold text-gray-900">Rapoarte</h1>
             <Link
               href="/dashboard"
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition"
@@ -261,7 +261,7 @@ export default function ReportsPage() {
 
           {/* Date Custom */}
           <form onSubmit={handleCustomDateSubmit} className="border-t pt-4">
-            <h3 className="font-semibold mb-3">Sau alege o perioadă personalizată:</h3>
+            <h3 className="font-semibold mb-3">Sau alege manual:</h3>
             <div className="flex gap-4">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -586,7 +586,7 @@ export default function ReportsPage() {
                   💡 Recomandări de Economisire
                 </h2>
                 <p className="text-sm text-gray-600 mt-1">
-                  Sugestii inteligente de la Claude AI pentru a-ți optimiza bugetul
+                  Sugestii pentru a cheltui mai eficient
                 </p>
               </div>
               <Link
@@ -653,8 +653,8 @@ export default function ReportsPage() {
         {/* Mesaj dacă nu sunt date */}
         {stats.byCategory.length === 0 && stats.byBank.length === 0 && (
           <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-6 py-4 rounded-lg text-center">
-            <p className="text-lg font-semibold mb-2">Nu există date pentru această perioadă</p>
-            <p>Importă tranzacții pentru a vedea grafice și statistici.</p>
+            <p className="text-lg font-semibold mb-2">Nicio tranzacție în perioada selectată</p>
+            <p>Importă tranzacții ca să vezi grafice și statistici.</p>
             <Link
               href="/dashboard/upload"
               className="inline-block mt-4 px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"

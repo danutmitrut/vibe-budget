@@ -104,7 +104,7 @@ export default function UploadPage() {
       } else if (fileType === "xlsx" || fileType === "xls") {
         result = await parseExcel(selectedFile);
       } else {
-        throw new Error("Format nesuportat. Folosește CSV sau Excel (.xlsx, .xls)");
+        throw new Error("Format nesuportat. Acceptăm doar CSV sau Excel.");
       }
 
       if (!result.success) {
@@ -250,10 +250,10 @@ export default function UploadPage() {
           >
             <div className="text-6xl mb-4">📎</div>
             <p className="text-lg text-gray-700 mb-2">
-              Drag & drop fișierul aici sau
+              Trage fișierul aici sau
             </p>
             <label className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer">
-              Alege fișier
+              Alege de pe calculator
               <input
                 type="file"
                 accept=".csv,.xlsx,.xls"

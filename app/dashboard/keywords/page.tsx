@@ -199,10 +199,10 @@ export default function KeywordsPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">
-              🔑 Keyword-uri Personalizate
+              🔑 Reguli de categorizare
             </h1>
             <p className="text-gray-600 mt-1">
-              Gestionează keyword-urile pentru auto-categorizare
+              Regulile care categorizează automat tranzacțiile
             </p>
           </div>
           <Link
@@ -254,19 +254,19 @@ export default function KeywordsPage() {
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               {selectedCategory
                 ? "Nu există keyword-uri pentru categoria selectată"
-                : "Nu ai keyword-uri salvate încă"}
+                : "Nicio regulă de categorizare salvată"}
             </h3>
             <p className="text-gray-600 mb-4">
               {selectedCategory
                 ? "Încearcă să selectezi o altă categorie."
-                : "Când categorizezi manual tranzacții, vei putea salva keyword-uri pentru auto-categorizare."}
+                : "Categorizează manual câteva tranzacții și vei putea salva reguli automate."}
             </p>
             {selectedCategory && (
               <button
                 onClick={() => setSelectedCategory("")}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700"
               >
-                Vezi toate keyword-urile
+                Vezi toate regulile
               </button>
             )}
           </div>
