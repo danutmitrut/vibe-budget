@@ -107,7 +107,7 @@ export default function ReportsPage() {
   /**
    * FUNCȚIE: Fetch statistics from API
    */
-  const fetchStats = async () => {
+  const fetchStats = async (overrideDates?: { startDate: string; endDate: string }) => {
     try {
       const authHeaders = await getAuthHeaders();
 
@@ -116,9 +116,10 @@ export default function ReportsPage() {
       // Construim URL-ul cu parametrii
       let url = `/api/reports/stats?period=${period}`;
 
-      // Dacă avem date custom, le adăugăm
-      if (customDates.startDate && customDates.endDate) {
-        url += `&startDate=${customDates.startDate}&endDate=${customDates.endDate}`;
+      // Dacă avem date custom, le adăugăm (override are prioritate față de state)
+      const dates = overrideDates || customDates;
+      if (dates.startDate && dates.endDate) {
+        url += `&startDate=${dates.startDate}&endDate=${dates.endDate}`;
       }
 
       const response = await fetch(url, {
@@ -190,7 +191,7 @@ export default function ReportsPage() {
   const handleCustomDateSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (customDates.startDate && customDates.endDate) {
-      fetchStats();
+      fetchStats({ startDate: customDates.startDate, endDate: customDates.endDate });
     }
   };
 
@@ -262,7 +263,7 @@ export default function ReportsPage() {
           {/* Date Custom */}
           <form onSubmit={handleCustomDateSubmit} className="border-t pt-4">
             <h3 className="font-semibold mb-3">Sau alege manual:</h3>
-            <div className="flex gap-4">
+            <div className="flex flex-col sm:flex-row gap-3">
               <div className="flex-1">
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Data de start:
@@ -292,7 +293,7 @@ export default function ReportsPage() {
               <div className="flex items-end">
                 <button
                   type="submit"
-                  className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
+                  className="w-full sm:w-auto px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition"
                 >
                   Aplică
                 </button>

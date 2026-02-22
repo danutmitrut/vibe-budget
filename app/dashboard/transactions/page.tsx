@@ -376,8 +376,8 @@ export default function TransactionsPage() {
       // Reîncărcăm datele pentru a reflecta modificările
       await fetchData();
 
-      // Ascundem mesajul după 5 secunde
-      setTimeout(() => setRecategorizeMessage(""), 5000);
+      // Ascundem mesajul după 8 secunde
+      setTimeout(() => setRecategorizeMessage(""), 8000);
     } catch (err: any) {
       setRecategorizeMessage(`❌ ${err.message}`);
     } finally {
@@ -618,11 +618,11 @@ export default function TransactionsPage() {
                       />
                     </th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Data</th>
-                    <th className="px-4 py-3 text-left text-sm font-semibold">Bancă</th>
+                    <th className="hidden md:table-cell px-4 py-3 text-left text-sm font-semibold">Bancă</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Descriere</th>
                     <th className="px-4 py-3 text-left text-sm font-semibold">Categorie</th>
                     <th className="px-4 py-3 text-right text-sm font-semibold">Sumă</th>
-                    <th className="px-4 py-3 text-center text-sm font-semibold">Acțiuni</th>
+                    <th className="hidden md:table-cell px-4 py-3 text-center text-sm font-semibold">Acțiuni</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -666,10 +666,10 @@ export default function TransactionsPage() {
                             }
                           })()}
                         </td>
-                        <td className="px-4 py-3 text-sm">
+                        <td className="hidden md:table-cell px-4 py-3 text-sm">
                           {getBankName(transaction.bankId)}
                         </td>
-                        <td className="px-4 py-3 text-sm">{transaction.description}</td>
+                        <td className="px-4 py-3 text-sm max-w-[120px] md:max-w-none truncate">{transaction.description}</td>
                         <td className="px-4 py-3 text-sm">
                           {category && editingCategoryId !== transaction.id ? (
                             <div className="flex items-center gap-2">
@@ -735,7 +735,7 @@ export default function TransactionsPage() {
                         >
                           {transaction.amount.toFixed(2)} {transaction.currency}
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="hidden md:table-cell px-4 py-3 text-center">
                           <button
                             onClick={() => handleDelete(transaction.id)}
                             className="text-red-600 hover:text-red-800 text-sm"

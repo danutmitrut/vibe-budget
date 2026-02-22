@@ -209,17 +209,18 @@ export default function UploadPage() {
             <h2 className="text-xl font-bold mb-4">Pasul 1: Selectează banca</h2>
             {banks.length === 0 ? (
               <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 px-4 py-3 rounded-lg">
-                Nu ai bănci adăugate.{" "}
+                <p className="font-semibold mb-1">Nicio bancă configurată</p>
+                <p className="text-sm">Trebuie să adaugi cel puțin o bancă înainte de a importa tranzacții.{" "}
                 <Link href="/dashboard/banks" className="underline font-semibold">
-                  Adaugă o bancă
-                </Link>{" "}
-                mai întâi.
+                  Mergi la Bănci →
+                </Link>
+                </p>
               </div>
             ) : (
               <select
                 value={selectedBankId}
                 onChange={(e) => setSelectedBankId(e.target.value)}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition"
               >
                 <option value="">Selectează banca...</option>
                 {banks.map((bank) => (
@@ -252,7 +253,7 @@ export default function UploadPage() {
             <p className="text-lg text-gray-700 mb-2">
               Trage fișierul aici sau
             </p>
-            <label className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition cursor-pointer">
+            <label className="inline-block px-6 py-3 bg-indigo-600 text-white rounded-lg font-medium hover:bg-indigo-700 transition cursor-pointer">
               Alege de pe calculator
               <input
                 type="file"

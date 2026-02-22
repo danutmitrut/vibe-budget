@@ -82,7 +82,7 @@ export default function Home() {
 
         {/* Footer note */}
         <p className="mt-12 text-sm text-gray-800">
-          Aplicație demonstrativă pentru cursul de Vibe Coding
+          Aplicație de portofoliu · 2026
         </p>
       </div>
     </div>
